@@ -1,0 +1,4808 @@
+{
+    "annotations": {
+      "list": [
+        {
+          "builtIn": 1,
+          "datasource": "-- Grafana --",
+          "enable": false,
+          "hide": true,
+          "iconColor": "rgba(0, 211, 255, 1)",
+          "limit": 100,
+          "matchAny": true,
+          "name": "Annotations & Alerts",
+          "showIn": 0,
+          "tags": [
+            "test"
+          ],
+          "type": "dashboard"
+        },
+        {
+          "datasource": "Jerem",
+          "enable": true,
+          "hide": false,
+          "iconColor": "rgba(255, 96, 96, 1)",
+          "limit": 100,
+          "name": "Weeks",
+          "query": "$end ->TSELEMENTS \n<%\n    'i' STORE\n    <% $i 3 == $i 4 == || $i 5 == || $i 6 == || %>\n    <% DROP 0 %>\n    IFT\n    <% $i 8 == %>\n    <% DUP 'date' STORE %>\n    IFT\n%>\nLMAP\nTSELEMENTS-> 1 s - 8 $date - d +\n'init' STORE\n[] 'res' STORE\n<%\n    $init $end $interval - > \n%>\n<%\n    $res $init + 'res' STORE \n    $init 1 w - 'init' STORE\n%>\nWHILE\n$res\n<%\n    'index' STORE\n    'tick' STORE\n    \n    { $tick 'Week ' $tick ->TSELEMENTS 9 GET TOSTRING +  }\n%>\nLMAP\n<%\n    DROP\n    NEWGTS\n    SWAP\n    <%\n        'name' STORE \n        NaN NaN NaN 1 ADDVALUE \n        $name RENAME\n    %>\n    FOREACH\n%>\nLMAP",
+          "showIn": 0,
+          "tags": [],
+          "type": "tags"
+        }
+      ]
+    },
+    "editable": true,
+    "gnetId": null,
+    "graphTooltip": 0,
+    "iteration": 1580119354380,
+    "links": [],
+    "panels": [
+      {
+        "collapsed": false,
+        "datasource": null,
+        "gridPos": {
+          "h": 1,
+          "w": 24,
+          "x": 0,
+          "y": 0
+        },
+        "id": 85,
+        "panels": [],
+        "title": "Quarter data",
+        "type": "row"
+      },
+      {
+        "cacheTimeout": null,
+        "colorBackground": true,
+        "colorValue": false,
+        "colors": [
+          "#f29191",
+          "#f9ba8f",
+          "#b7dbab"
+        ],
+        "datasource": "Jerem",
+        "description": "Working days left - Time to complete all epics for current Quarter",
+        "format": "none",
+        "gauge": {
+          "maxValue": 100,
+          "minValue": 0,
+          "show": false,
+          "thresholdLabels": false,
+          "thresholdMarkers": true
+        },
+        "gridPos": {
+          "h": 3,
+          "w": 3,
+          "x": 0,
+          "y": 1
+        },
+        "id": 100,
+        "interval": null,
+        "links": [],
+        "mappingType": 1,
+        "mappingTypes": [
+          {
+            "name": "value to text",
+            "value": 1
+          },
+          {
+            "name": "range to text",
+            "value": 2
+          }
+        ],
+        "maxDataPoints": 100,
+        "nullPointMode": "connected",
+        "nullText": null,
+        "options": {},
+        "postfix": "",
+        "postfixFontSize": "50%",
+        "prefix": "",
+        "prefixFontSize": "50%",
+        "rangeMaps": [
+          {
+            "from": "null",
+            "text": "N/A",
+            "to": "null"
+          }
+        ],
+        "sparkline": {
+          "fillColor": "rgba(31, 118, 189, 0.18)",
+          "full": false,
+          "lineColor": "rgb(31, 120, 193)",
+          "show": false
+        },
+        "tableColumn": "",
+        "targets": [
+          {
+            "advancedMode": true,
+            "expr": "[ $RTOKEN 'jerem.jira.sprint.events' { 'project' $project 'sprint' 'current' } $end -1 ] FETCH\n[ SWAP \"start\" mapper.eq 0 0 0 ] MAP NONEMPTY\n\n$end 'tick' STORE\n\n<% \n    DUP SIZE 0 >\n%>\n<%\n    0 GET LASTTICK 'tick' STORE\n%>\n<% \n    DROP\n%>\nIFTE\n\n[ $RTOKEN 'jerem.jira.sprint.storypoint.done' { 'project' $project 'sprint' '~.*' } $tick 1 h  ] FETCH\n\n{\n  'current' 1\n}\nSWAP\n\n<%\n    LABELS 'sprint' GET \n    1 SWAP\n    PUT\n%>\nFOREACH\n'sprintsToRemove' STORE\n\n[ $RTOKEN '~jerem.jira.sprint.storypoint.done' { 'project' $project 'sprint' '~.*' } $end -1  ] FETCH\n\n[]\nSWAP\n\n<% \n  DUP\n  LABELS 'sprint' GET\n  <%\n    $sprintsToRemove SWAP CONTAINSKEY\n  %>\n  <%\n    DROP DROP CONTINUE\n  %>\n  IFT\n  DROP\n  +\n%>\nFOREACH\n[ SWAP [] reducer.sum ] REDUCE\n[ SWAP mapper.todouble 0 0 0 ] MAP\n 0 GET\n10.0 /\n[ SWAP bucketizer.mean 0 0 1 ] BUCKETIZE 0 GET\nVALUES 0 GET 'velocity' STORE\n\n\n// Get current quarter 100% completion metrics\n[ $RTOKEN '~jerem.jira.epic.storypoint.*' { 'project' $project 'quarter' $activeQuarter } $end 1 h - $interval  ] FETCH DUP 'set' STORE\n\n<% \n  DROP\n  DUP\n  NAME 'name' STORE\n  {\n    'class' \n     $name\n  }\n  RELABEL\n%>\nLMAP\n[ SWAP [ 'class' 'key' ] reducer.max ] REDUCE\n[ SWAP [] bucketizer.last $end 0 1 ] BUCKETIZE \n'data' STORE\n[ \n    [ $data [] 'jerem.jira.epic.storypoint' filter.byclass ] FILTER\n    [ $data [] 'jerem.jira.epic.storypoint.done' filter.byclass ] FILTER \n [ 'key' ]\n  op.eq\n]\nAPPLY\n[ SWAP true mapper.eq 0 0 0 ] MAP\nNONEMPTY\n<% \n   DROP\n   LABELS 'key' GET\n%>\nLMAP \n'keys' STORE\n[ $set [] { 'key' '~' $keys '|' JOIN + }  filter.bylabels ] FILTER\n\n// Get current Metrics needed to be completed\n\n[ $RTOKEN '~jerem.jira.epic.*' { 'project' $project 'quarter' $activeQuarter } $end 1 h ] FETCH\nAPPEND\n\n<%\n    DROP\n    DUP NAME 'name' STORE\n    {\n        'class'\n        $name\n    }\n    RELABEL\n%> \nLMAP\n\n[ SWAP [ 'class' 'key' ] reducer.max ] REDUCE\n\n[ SWAP bucketizer.last $end 0 1 ] BUCKETIZE\n\n[ SWAP [ 'class' ] reducer.sum ] REDUCE\n{}\nSWAP\n<% \n    DUP \n    NAME\n    SWAP\n    VALUES 0 GET \n    SWAP\n    PUT\n%>\nFOREACH\n'stats' STORE\n\n$stats 'jerem.jira.epic.storypoint.done' GET TODOUBLE  'done' STORE\n$stats 'jerem.jira.epic.storypoint' GET TODOUBLE 'total' STORE\n\n$end ->TSELEMENTS 0 GET TOSTRING 'year' STORE\nNEWGTS 'notWorkingDay' RENAME 'notWorkingDay' STORE\n$nowork EVAL <% $year '-' + SWAP + 'T12:00:00.000000Z' + TOTIMESTAMP $notWorkingDay SWAP NaN NaN NaN 1 ADDVALUE 'notWorkingDay' STORE %> FOREACH\n$quarter 'T12:00:00.000000Z' + TOTIMESTAMP DUP 'endQuarterDate' STORE\n->TSELEMENTS DUP\n8 GET 'endQuarterDayOfTheWeek' STORE\n9 GET 'endQuarterWeek' STORE\n$end ->TSELEMENTS DUP\n\n8 GET 'nowDayOfTheWeek'  STORE \n\n// Remove saturday and sunday\n<% $nowDayOfTheWeek 5 > %>\n<% 5 'nowDayOfTheWeek' STORE  %>\nIFT \n9 GET 1 + 'nowWeek' STORE\n\n<% $endQuarterDate ->TSELEMENTS 0 GET TOSTRING $year != %>\n<% \n    $nowork EVAL \n    <% \n        $endQuarterDate ->TSELEMENTS 0 GET TOSTRING '-' + SWAP + 'T12:00:00.000000Z' + TOTIMESTAMP \n        $notWorkingDay SWAP NaN NaN NaN 1 ADDVALUE 'notWorkingDay' STORE \n    %> FOREACH\n    $endQuarterWeek 52 + 'endQuarterWeek' STORE\n%> \nIFT\n\n$endQuarterDayOfTheWeek $nowDayOfTheWeek -\n$endQuarterWeek $nowWeek - 1 + 5 *\n+\n'value' STORE\n$notWorkingDay [ [ $end $endQuarterDate ] ] CLIP \nNONEMPTY\n\n<% DUP SIZE 0 ==  %>\n<% DROP 0 'holidays' STORE %>\n<%\n    [ SWAP bucketizer.count 0 0 1 ] BUCKETIZE 0 GET VALUES 0 GET 'holidays' STORE\n%>\nIFTE\n\n$value $holidays - 'value' STORE\n\nNEWGTS \n$end NaN NaN NaN $value $total $done - TODOUBLE $velocity TODOUBLE / CEIL - ADDVALUE\n",
+            "friendlyQuery": {
+              "bucketCount": 50,
+              "bucketizer": null,
+              "bucketizers": [
+                "sum",
+                "max",
+                "min",
+                "mean",
+                "mean.circular",
+                "bucketizer.mean.circular.exclude-nulls",
+                "first",
+                "last",
+                "join",
+                "median",
+                "count",
+                "and",
+                "or"
+              ],
+              "className": "",
+              "filter": null,
+              "filterLabels": [],
+              "filterParamClass": "",
+              "filterParamMap": {},
+              "filterParamNumber": 0,
+              "filters": [
+                {
+                  "name": "byclass",
+                  "type": "S"
+                },
+                {
+                  "name": "bylabels",
+                  "type": "M"
+                },
+                {
+                  "name": "last.eq",
+                  "type": "N"
+                },
+                {
+                  "name": "last.ne",
+                  "type": "N"
+                },
+                {
+                  "name": "last.gt",
+                  "type": "N"
+                },
+                {
+                  "name": "last.ge",
+                  "type": "N"
+                },
+                {
+                  "name": "last.lt",
+                  "type": "N"
+                },
+                {
+                  "name": "last.le",
+                  "type": "N"
+                }
+              ],
+              "labels": {},
+              "nameFormat": "",
+              "readToken": "",
+              "reducer": null,
+              "reducerLabels": [],
+              "reducers": [
+                "argmax",
+                "argmin",
+                "count",
+                "count.exclude-nulls",
+                "count.include-nulls",
+                "join",
+                "join.forbid-nulls",
+                "max",
+                "max.forbid-nulls",
+                "mean",
+                "mean.exclude-nulls",
+                "mean.circular",
+                "mean.circular.exclude-nulls",
+                "median",
+                "min",
+                "min.forbid-nulls",
+                "and",
+                "and.exclude-nulls",
+                "or",
+                "or.exclude-nulls",
+                "sd",
+                "shannonentropy.0",
+                "shannonentropy.1",
+                "sum",
+                "sum.forbid-nulls",
+                "var"
+              ]
+            },
+            "hideAttributes": true,
+            "hideLabels": true,
+            "refId": "A"
+          }
+        ],
+        "thresholds": "-1,2",
+        "title": "Predictability",
+        "type": "singlestat",
+        "valueFontSize": "80%",
+        "valueMaps": [
+          {
+            "op": "=",
+            "text": "N/A",
+            "value": "null"
+          }
+        ],
+        "valueName": "avg"
+      },
+      {
+        "cacheTimeout": null,
+        "colorBackground": false,
+        "colorValue": false,
+        "colors": [
+          "#7eb26d",
+          "#5195ce",
+          "#badff4"
+        ],
+        "datasource": "Jerem",
+        "format": "percent",
+        "gauge": {
+          "maxValue": 100,
+          "minValue": 0,
+          "show": false,
+          "thresholdLabels": false,
+          "thresholdMarkers": true
+        },
+        "gridPos": {
+          "h": 3,
+          "w": 2,
+          "x": 3,
+          "y": 1
+        },
+        "id": 87,
+        "interval": null,
+        "links": [],
+        "mappingType": 1,
+        "mappingTypes": [
+          {
+            "name": "value to text",
+            "value": 1
+          },
+          {
+            "name": "range to text",
+            "value": 2
+          }
+        ],
+        "maxDataPoints": 100,
+        "nullPointMode": "connected",
+        "nullText": null,
+        "options": {},
+        "postfix": "",
+        "postfixFontSize": "50%",
+        "prefix": "",
+        "prefixFontSize": "50%",
+        "rangeMaps": [
+          {
+            "from": "null",
+            "text": "N/A",
+            "to": "null"
+          }
+        ],
+        "sparkline": {
+          "fillColor": "rgba(31, 118, 189, 0.18)",
+          "full": false,
+          "lineColor": "rgb(31, 120, 193)",
+          "show": false
+        },
+        "tableColumn": "",
+        "targets": [
+          {
+            "advancedMode": true,
+            "expr": "// Get current quarter 100% completion metrics\n[ $RTOKEN '~jerem.jira.epic.storypoint.*' { 'project' $project 'quarter' $activeQuarter } $end 1 h - $interval  ] FETCH DUP 'set' STORE\n\n<% \n  DROP\n  DUP\n  NAME 'name' STORE\n  {\n    'class' \n     $name\n  }\n  RELABEL\n%>\nLMAP\n[ SWAP [ 'class' 'key' ] reducer.max ] REDUCE\n[ SWAP [] bucketizer.last $end 0 1 ] BUCKETIZE \n'data' STORE\n[ \n    [ $data [] 'jerem.jira.epic.storypoint' filter.byclass ] FILTER\n    [ $data [] 'jerem.jira.epic.storypoint.done' filter.byclass ] FILTER \n [ 'key' ]\n  op.eq\n]\nAPPLY\n[ SWAP true mapper.eq 0 0 0 ] MAP\nNONEMPTY\n<% \n   DROP\n   LABELS 'key' GET\n%>\nLMAP \n'keys' STORE\n[ $set [] { 'key' '~' $keys '|' JOIN + }  filter.bylabels ] FILTER\n\n\n[ $RTOKEN '~jerem.jira.epic.*' { 'project' $project 'quarter' $activeQuarter } $end 1 h ] FETCH\nAPPEND\n\n<%\n    DROP\n    DUP NAME 'name' STORE\n    {\n        'class'\n        $name\n    }\n    RELABEL\n%> \nLMAP\n\n[ SWAP [ 'class' 'key' ] reducer.max ] REDUCE\n[ SWAP bucketizer.last $end 0 1 ] BUCKETIZE\n[ SWAP [ 'class' ] reducer.sum ] REDUCE\n{}\nSWAP\n<% \n    DUP \n    NAME\n    SWAP\n    VALUES 0 GET \n    SWAP\n    PUT\n%>\nFOREACH\n'stats' STORE\n\n$stats 'jerem.jira.epic.storypoint.done' GET TODOUBLE 'done' STORE\n$stats 'jerem.jira.epic.storypoint' GET TODOUBLE 'total' STORE\n\nNEWGTS 'done' RENAME \n$start $interval 2 / + NaN NaN NaN $done TODOUBLE $total TODOUBLE 100.0 / / ADDVALUE",
+            "friendlyQuery": {
+              "bucketCount": 50,
+              "bucketizer": null,
+              "bucketizers": [
+                "sum",
+                "max",
+                "min",
+                "mean",
+                "mean.circular",
+                "bucketizer.mean.circular.exclude-nulls",
+                "first",
+                "last",
+                "join",
+                "median",
+                "count",
+                "and",
+                "or"
+              ],
+              "className": "",
+              "filter": null,
+              "filterLabels": [],
+              "filterParamClass": "",
+              "filterParamMap": {},
+              "filterParamNumber": 0,
+              "filters": [
+                {
+                  "name": "byclass",
+                  "type": "S"
+                },
+                {
+                  "name": "bylabels",
+                  "type": "M"
+                },
+                {
+                  "name": "last.eq",
+                  "type": "N"
+                },
+                {
+                  "name": "last.ne",
+                  "type": "N"
+                },
+                {
+                  "name": "last.gt",
+                  "type": "N"
+                },
+                {
+                  "name": "last.ge",
+                  "type": "N"
+                },
+                {
+                  "name": "last.lt",
+                  "type": "N"
+                },
+                {
+                  "name": "last.le",
+                  "type": "N"
+                }
+              ],
+              "labels": {},
+              "nameFormat": "",
+              "readToken": "",
+              "reducer": null,
+              "reducerLabels": [],
+              "reducers": [
+                "argmax",
+                "argmin",
+                "count",
+                "count.exclude-nulls",
+                "count.include-nulls",
+                "join",
+                "join.forbid-nulls",
+                "max",
+                "max.forbid-nulls",
+                "mean",
+                "mean.exclude-nulls",
+                "mean.circular",
+                "mean.circular.exclude-nulls",
+                "median",
+                "min",
+                "min.forbid-nulls",
+                "and",
+                "and.exclude-nulls",
+                "or",
+                "or.exclude-nulls",
+                "sd",
+                "shannonentropy.0",
+                "shannonentropy.1",
+                "sum",
+                "sum.forbid-nulls",
+                "var"
+              ]
+            },
+            "hideAttributes": true,
+            "hideLabels": true,
+            "refId": "A"
+          }
+        ],
+        "thresholds": "",
+        "title": "Quarter progression",
+        "type": "singlestat",
+        "valueFontSize": "80%",
+        "valueMaps": [
+          {
+            "op": "=",
+            "text": "N/A",
+            "value": "null"
+          }
+        ],
+        "valueName": "avg"
+      },
+      {
+        "cacheTimeout": null,
+        "colorBackground": false,
+        "colorPostfix": false,
+        "colorPrefix": false,
+        "colorValue": false,
+        "colors": [
+          "#508642",
+          "rgba(237, 129, 40, 0.89)",
+          "#d44a3a"
+        ],
+        "datasource": "Jerem",
+        "decimals": 1,
+        "format": "short",
+        "gauge": {
+          "maxValue": 100,
+          "minValue": 0,
+          "show": false,
+          "thresholdLabels": false,
+          "thresholdMarkers": true
+        },
+        "gridPos": {
+          "h": 3,
+          "w": 2,
+          "x": 5,
+          "y": 1
+        },
+        "id": 88,
+        "interval": null,
+        "links": [],
+        "mappingType": 1,
+        "mappingTypes": [
+          {
+            "name": "value to text",
+            "value": 1
+          },
+          {
+            "name": "range to text",
+            "value": 2
+          }
+        ],
+        "maxDataPoints": 100,
+        "nullPointMode": "connected",
+        "nullText": null,
+        "options": {},
+        "postfix": "",
+        "postfixFontSize": "50%",
+        "prefix": "",
+        "prefixFontSize": "50%",
+        "rangeMaps": [
+          {
+            "from": "null",
+            "text": "N/A",
+            "to": "null"
+          }
+        ],
+        "sparkline": {
+          "fillColor": "rgba(31, 118, 189, 0.18)",
+          "full": false,
+          "lineColor": "rgb(31, 120, 193)",
+          "show": true
+        },
+        "tableColumn": "",
+        "targets": [
+          {
+            "advancedMode": true,
+            "expr": "// Remove current sprints from computation\n[ $RTOKEN 'jerem.jira.sprint.events' { 'project' $project 'sprint' 'current' } $end -1 ] FETCH\n[ SWAP \"start\" mapper.eq 0 0 0 ] MAP NONEMPTY\n\n$end 'tick' STORE\n\n<% \n    DUP SIZE 0 >\n%>\n<%\n    0 GET LASTTICK 'tick' STORE\n%>\n<% \n    DROP\n%>\nIFTE\n\n[ $RTOKEN 'jerem.jira.sprint.storypoint.done' { 'project' $project 'sprint' '~(?!current).*' } $tick 1 d + 1 d 1 + ] FETCH\n\n{}\nSWAP\n\n<%\n    LABELS 'sprint' GET \n    1 SWAP\n    PUT\n%>\nFOREACH\n'sprintsToRemove' STORE\n\n[ $RTOKEN '~jerem.jira.sprint.storypoint.done' { 'project' $project 'sprint' '~(?!current).*' } $tick -1 ] FETCH\n\n[]\nSWAP\n\n<% \n  DUP\n  LABELS 'sprint' GET\n  <%\n    $sprintsToRemove SWAP CONTAINSKEY\n  %>\n  <%\n    DROP DROP CONTINUE\n  %>\n  IFT\n  DROP\n  +\n%>\nFOREACH\n\n\nDUP SIZE 10.0 * 'days' STORE\n\n[ SWAP bucketizer.last $end 0 1 ] BUCKETIZE\n[ SWAP [] reducer.sum ] REDUCE\n[ SWAP mapper.todouble 0 0 0 ] MAP\n[ SWAP 1 $days / mapper.mul 0 0 0 ] MAP",
+            "friendlyQuery": {
+              "bucketCount": 50,
+              "bucketizer": null,
+              "bucketizers": [
+                "sum",
+                "max",
+                "min",
+                "mean",
+                "mean.circular",
+                "bucketizer.mean.circular.exclude-nulls",
+                "first",
+                "last",
+                "join",
+                "median",
+                "count",
+                "and",
+                "or"
+              ],
+              "className": "",
+              "filter": null,
+              "filterLabels": [],
+              "filterParamClass": "",
+              "filterParamMap": {},
+              "filterParamNumber": 0,
+              "filters": [
+                {
+                  "name": "byclass",
+                  "type": "S"
+                },
+                {
+                  "name": "bylabels",
+                  "type": "M"
+                },
+                {
+                  "name": "last.eq",
+                  "type": "N"
+                },
+                {
+                  "name": "last.ne",
+                  "type": "N"
+                },
+                {
+                  "name": "last.gt",
+                  "type": "N"
+                },
+                {
+                  "name": "last.ge",
+                  "type": "N"
+                },
+                {
+                  "name": "last.lt",
+                  "type": "N"
+                },
+                {
+                  "name": "last.le",
+                  "type": "N"
+                }
+              ],
+              "labels": {},
+              "nameFormat": "",
+              "readToken": "",
+              "reducer": null,
+              "reducerLabels": [],
+              "reducers": [
+                "argmax",
+                "argmin",
+                "count",
+                "count.exclude-nulls",
+                "count.include-nulls",
+                "join",
+                "join.forbid-nulls",
+                "max",
+                "max.forbid-nulls",
+                "mean",
+                "mean.exclude-nulls",
+                "mean.circular",
+                "mean.circular.exclude-nulls",
+                "median",
+                "min",
+                "min.forbid-nulls",
+                "and",
+                "and.exclude-nulls",
+                "or",
+                "or.exclude-nulls",
+                "sd",
+                "shannonentropy.0",
+                "shannonentropy.1",
+                "sum",
+                "sum.forbid-nulls",
+                "var"
+              ]
+            },
+            "hideAttributes": true,
+            "hideLabels": true,
+            "refId": "A"
+          }
+        ],
+        "thresholds": "",
+        "title": "Team velocity",
+        "type": "singlestat",
+        "valueFontSize": "80%",
+        "valueMaps": [
+          {
+            "op": "=",
+            "text": "N/A",
+            "value": "null"
+          }
+        ],
+        "valueName": "avg"
+      },
+      {
+        "cacheTimeout": null,
+        "colorBackground": false,
+        "colorValue": false,
+        "colors": [
+          "#299c46",
+          "rgba(237, 129, 40, 0.89)",
+          "#d44a3a"
+        ],
+        "datasource": "Jerem",
+        "decimals": null,
+        "description": "Average time spent per sprint in impediment",
+        "format": "dthms",
+        "gauge": {
+          "maxValue": 100,
+          "minValue": 0,
+          "show": false,
+          "thresholdLabels": false,
+          "thresholdMarkers": true
+        },
+        "gridPos": {
+          "h": 3,
+          "w": 3,
+          "x": 7,
+          "y": 1
+        },
+        "id": 90,
+        "interval": null,
+        "links": [],
+        "mappingType": 1,
+        "mappingTypes": [
+          {
+            "name": "value to text",
+            "value": 1
+          },
+          {
+            "name": "range to text",
+            "value": 2
+          }
+        ],
+        "maxDataPoints": 100,
+        "nullPointMode": "connected",
+        "nullText": null,
+        "options": {},
+        "postfix": "",
+        "postfixFontSize": "50%",
+        "prefix": "",
+        "prefixFontSize": "50%",
+        "rangeMaps": [
+          {
+            "from": "null",
+            "text": "N/A",
+            "to": "null"
+          }
+        ],
+        "sparkline": {
+          "fillColor": "rgba(31, 118, 189, 0.18)",
+          "full": false,
+          "lineColor": "rgb(31, 120, 193)",
+          "show": false
+        },
+        "tableColumn": "",
+        "targets": [
+          {
+            "advancedMode": true,
+            "expr": "// Remove current sprints from computation\n[ $RTOKEN 'jerem.jira.impediment.total.timespent' { 'project' $project 'sprint' 'current' } $end 1 h ] FETCH\n\n$end 'tick' STORE\n\n<% \n    DUP SIZE 0 >\n%>\n<%\n    0 GET LASTTICK 'tick' STORE\n%>\n<% \n    DROP\n%>\nIFTE\n\n\n[ $RTOKEN 'jerem.jira.impediment.total.timespent' { 'project' $project 'sprint' '~.*' } $tick 1 h  ] FETCH\n\n\n{\n  'current' 1\n}\nSWAP\n\n<%\n    LABELS 'sprint' GET \n    1 SWAP\n    PUT\n%>\nFOREACH\n'sprintsToRemove' STORE\n\n[ $RTOKEN 'jerem.jira.impediment.total.timespent' { 'project' $project 'sprint' '~.*' } $end -1  ] FETCH\n\n[]\nSWAP\n\n<% \n  DUP\n  LABELS 'sprint' GET\n  <%\n    $sprintsToRemove SWAP CONTAINSKEY\n  %>\n  <%\n    DROP DROP CONTINUE\n  %>\n  IFT\n  DROP\n  +\n%>\nFOREACH\n<%\n  DROP\n  DUP LABELS 'sprint' GET 'key' STORE\n  <% $sprint 'current' == %>\n  <% $project TOLOWER '-current' + 'key' STORE %>\n  IFT \n  \n  <%\n    'substract' DEFINED\n  %>\n  <%\n  <% $substract EVAL $key CONTAINSKEY %> \n  <% \n    $key GET 'value' STORE \n    [ SWAP $value TODOUBLE -1.0 * h 1 s / mapper.add 0 0 0 ] MAP\n    0 GET\n  %>\n  <% DROP %>\n  IFTE \n  %>\n  IFT\n%>\nLMAP\n\n[ SWAP [] reducer.sum ] REDUCE\n[ SWAP mapper.todouble 0 0 0 ] MAP\n 0 GET\n[ SWAP bucketizer.mean 0 0 1 ] BUCKETIZE DUP\n0 GET VALUES 0 GET\n\n \n'value' STORE\n/*\ns HUMANDURATION 'm' SPLIT \n<% DUP SIZE 1 > %>\n<% 0 GET 'm' + %>\n<% 0 GET 0 3 SUBSTRING 's' + %>\nIFTE\n'value' STORE\n*/\n\n[ SWAP $value mapper.replace 0 0 0 ] MAP",
+            "friendlyQuery": {
+              "bucketCount": 50,
+              "bucketizer": null,
+              "bucketizers": [
+                "sum",
+                "max",
+                "min",
+                "mean",
+                "mean.circular",
+                "bucketizer.mean.circular.exclude-nulls",
+                "first",
+                "last",
+                "join",
+                "median",
+                "count",
+                "and",
+                "or"
+              ],
+              "className": "",
+              "filter": null,
+              "filterLabels": [],
+              "filterParamClass": "",
+              "filterParamMap": {},
+              "filterParamNumber": 0,
+              "filters": [
+                {
+                  "name": "byclass",
+                  "type": "S"
+                },
+                {
+                  "name": "bylabels",
+                  "type": "M"
+                },
+                {
+                  "name": "last.eq",
+                  "type": "N"
+                },
+                {
+                  "name": "last.ne",
+                  "type": "N"
+                },
+                {
+                  "name": "last.gt",
+                  "type": "N"
+                },
+                {
+                  "name": "last.ge",
+                  "type": "N"
+                },
+                {
+                  "name": "last.lt",
+                  "type": "N"
+                },
+                {
+                  "name": "last.le",
+                  "type": "N"
+                }
+              ],
+              "labels": {},
+              "readToken": "",
+              "reducer": null,
+              "reducerLabels": [],
+              "reducers": [
+                "argmax",
+                "argmin",
+                "count",
+                "count.exclude-nulls",
+                "count.include-nulls",
+                "join",
+                "join.forbid-nulls",
+                "max",
+                "max.forbid-nulls",
+                "mean",
+                "mean.exclude-nulls",
+                "mean.circular",
+                "mean.circular.exclude-nulls",
+                "median",
+                "min",
+                "min.forbid-nulls",
+                "and",
+                "and.exclude-nulls",
+                "or",
+                "or.exclude-nulls",
+                "sd",
+                "shannonentropy.0",
+                "shannonentropy.1",
+                "sum",
+                "sum.forbid-nulls",
+                "var"
+              ]
+            },
+            "hideAttributes": true,
+            "hideLabels": true,
+            "refId": "A"
+          }
+        ],
+        "thresholds": "",
+        "title": "Average impediment",
+        "type": "singlestat",
+        "valueFontSize": "80%",
+        "valueMaps": [
+          {
+            "op": "=",
+            "text": "N/A",
+            "value": "null"
+          }
+        ],
+        "valueName": "avg"
+      },
+      {
+        "columns": [],
+        "datasource": "Jerem",
+        "fontSize": "110%",
+        "gridPos": {
+          "h": 6,
+          "w": 14,
+          "x": 10,
+          "y": 1
+        },
+        "id": 56,
+        "links": [],
+        "options": {},
+        "pageSize": null,
+        "scroll": true,
+        "showHeader": true,
+        "sort": {
+          "col": null,
+          "desc": false
+        },
+        "styles": [
+          {
+            "alias": "",
+            "colorMode": null,
+            "dateFormat": "YYYY-MM-DD HH:mm:ss",
+            "pattern": "Done",
+            "type": "number",
+            "unit": "none"
+          },
+          {
+            "alias": "",
+            "colorMode": "cell",
+            "colors": [
+              "rgba(245, 54, 54, 0.9)",
+              "rgba(237, 129, 40, 0.89)",
+              "rgba(50, 172, 45, 0.97)"
+            ],
+            "dateFormat": "YYYY-MM-DD HH:mm:ss",
+            "decimals": 0,
+            "link": false,
+            "mappingType": 1,
+            "pattern": "%",
+            "thresholds": [
+              "1",
+              "100"
+            ],
+            "type": "number",
+            "unit": "percent"
+          },
+          {
+            "alias": "",
+            "colorMode": null,
+            "colors": [
+              "rgba(245, 54, 54, 0.9)",
+              "rgba(237, 129, 40, 0.89)",
+              "rgba(50, 172, 45, 0.97)"
+            ],
+            "dateFormat": "YYYY-MM-DD HH:mm:ss",
+            "decimals": 2,
+            "link": true,
+            "linkTargetBlank": true,
+            "linkTooltip": "Show ${__cell}",
+            "linkUrl": "https://projects.dsi.ovh/browse/${__cell}",
+            "mappingType": 1,
+            "pattern": "Epic",
+            "thresholds": [],
+            "type": "string",
+            "unit": "short"
+          },
+          {
+            "alias": "",
+            "colorMode": null,
+            "colors": [
+              "rgba(245, 54, 54, 0.9)",
+              "rgba(237, 129, 40, 0.89)",
+              "rgba(50, 172, 45, 0.97)"
+            ],
+            "dateFormat": "YYYY-MM-DD HH:mm:ss",
+            "decimals": 2,
+            "mappingType": 1,
+            "pattern": "Summary",
+            "preserveFormat": false,
+            "sanitize": false,
+            "thresholds": [],
+            "type": "string",
+            "unit": "short"
+          },
+          {
+            "alias": "",
+            "colorMode": null,
+            "colors": [
+              "rgba(245, 54, 54, 0.9)",
+              "rgba(237, 129, 40, 0.00)",
+              "rgba(50, 172, 45, 0)"
+            ],
+            "dateFormat": "YYYY-MM-DD HH:mm:ss",
+            "decimals": 0,
+            "mappingType": 1,
+            "pattern": "StoryPoint",
+            "thresholds": [
+              "1",
+              "100000"
+            ],
+            "type": "number",
+            "unit": "none"
+          },
+          {
+            "alias": "",
+            "colorMode": null,
+            "colors": [
+              "rgba(245, 54, 54, 0.9)",
+              "rgba(237, 129, 40, 0.89)",
+              "rgba(50, 172, 45, 0.97)"
+            ],
+            "decimals": 2,
+            "pattern": "/.*/",
+            "thresholds": [],
+            "type": "number",
+            "unit": "short"
+          }
+        ],
+        "targets": [
+          {
+            "advancedMode": true,
+            "expr": "'grafanaMultiVariable' FIMPORT\n$epic @grafanaMultiVariable 'epic' STORE\n<% $epic 'All' ==  %>\n  <% '~.*' 'Epic' STORE  %>\nIFT\n\n[ $RTOKEN '~jerem.jira.epic.storypoint.*' { 'project' $project 'quarter' $activeQuarter } $end 1 h - $interval  ] FETCH DUP 'set' STORE\n\n<% \n  DROP\n  DUP\n  NAME 'name' STORE\n  {\n    'class' \n     $name\n  }\n  RELABEL\n%>\nLMAP\n[ SWAP [] bucketizer.last $end 0 1 ] BUCKETIZE \n[ SWAP [ 'class' 'key' ] reducer.max ] REDUCE\n'data' STORE\n[ \n    [ $data [] 'jerem.jira.epic.storypoint' filter.byclass ] FILTER\n    [ $data [] 'jerem.jira.epic.storypoint.done' filter.byclass ] FILTER \n [ 'key' ]\n  op.eq\n]\nAPPLY\n[ SWAP true mapper.eq 0 0 0 ] MAP\nNONEMPTY\n<% \n   DROP\n   LABELS 'key' GET\n%>\nLMAP \n'keys' STORE\n[ $set [] { 'key' '~' $keys '|' JOIN + }  filter.bylabels ] FILTER\n\n[ $RTOKEN '~jerem.jira.*' { 'quarter' $activeQuarter 'project' $project } $end 1 h ] FETCH\nAPPEND\n\n// Group by key\n<% DROP\n  DUP NAME 'class' SWAP 2 ->MAP RELABEL\n%> LMAP\n[ SWAP [ 'class' 'key' 'summary' ] reducer.max ] REDUCE\n'series' STORE\n\n// Extract keys\n$series\n<% DROP\n    LABELS 'key' GET\n%> LMAP\nUNIQUE 'keys' STORE\n\n$keys\n<% DROP\n  'key' STORE\n  [ $series [] { 'key' $key } filter.bylabels ] FILTER\n  \n  {} SWAP\n  <%\n    DUP LABELS 'key' GET 'key' SWAP 2 ->MAP SWAP\n    DUP LABELS 'summary' GET 'summary' SWAP 2 ->MAP SWAP\n    DUP NAME '.' SPLIT DUP SIZE 1 - GET SWAP DUP LASTTICK ATTICK 4 GET 2 ->MAP APPEND APPEND APPEND\n  %> FOREACH\n%> LMAP\n\n<% DROP\n  'v' STORE\n  [ \n    $v 'key' GET\n    $v 'summary' GET <% DUP ISNULL %> <% DROP '' %> <% URLDECODE %> IFTE\n    $v 'storypoint' GET\n    $v 'done' GET\n    $v 'inprogress' GET\n    $v 'unestimated' GET\n    $v 'dependency' GET\n    <% $v 'storypoint' GET 0 == %>\n      <% 0 %>\n      <% $v 'done' GET TODOUBLE $v 'storypoint' GET TODOUBLE / 100 * %>\n    IFTE\n  ]\n%> LMAP\n\n<%\n  7 GET TODOUBLE\n%> SORTBY REVERSE\n\n// Count total\n$series\n[ SWAP bucketizer.last $end 0 1 ] BUCKETIZE\n[ SWAP [ 'class' ] reducer.sum ] REDUCE\n{} SWAP\n<%\n  DUP LABELS 'key' GET 'key' SWAP 2 ->MAP SWAP\n  DUP LABELS 'summary' GET 'summary' SWAP 2 ->MAP SWAP\n  DUP NAME '.' SPLIT DUP SIZE 1 - GET SWAP DUP LASTTICK ATTICK 4 GET 2 ->MAP APPEND APPEND APPEND\n%> FOREACH\n'total' STORE\n\n[ '' '' ] +\n\n[ \n  '' \n  'Total' \n  $total 'storypoint' GET \n  $total 'done' GET \n  $total 'inprogress' GET\n  $total 'unestimated' GET \n  $total 'dependency' GET \n  $total 'done' GET TODOUBLE $total 'storypoint' GET TODOUBLE / 100 * ] +\n\n'rows' STORE\n\n{\n  'columns' [\n    {\n      'text' 'Epic'\n      'type' 'string'\n    }\n    {\n      'text' 'Summary'\n      'type' 'string'\n    }\n    {\n      'text' 'StoryPoint'\n      'type' 'number'\n    }\n    {\n      'text' 'Done'\n      'type' 'number'\n    }\n    {\n      'text' 'Doing'\n      'type' 'number'\n    }\n    {\n      'text' 'Unestimated'\n      'type' 'number'\n    }\n    {\n      'text' 'Dependency'\n      'type' 'number'\n    }\n    {\n      'text' '%25'\n      'type' 'number'\n    }\n  ]\n  'rows'\n    $rows\n}",
+            "friendlyQuery": {
+              "bucketCount": 50,
+              "bucketizer": null,
+              "bucketizers": [
+                "sum",
+                "max",
+                "min",
+                "mean",
+                "mean.circular",
+                "bucketizer.mean.circular.exclude-nulls",
+                "first",
+                "last",
+                "join",
+                "median",
+                "count",
+                "and",
+                "or"
+              ],
+              "className": "",
+              "filter": null,
+              "filterLabels": [],
+              "filterParamClass": "",
+              "filterParamMap": {},
+              "filterParamNumber": 0,
+              "filters": [
+                {
+                  "name": "byclass",
+                  "type": "S"
+                },
+                {
+                  "name": "bylabels",
+                  "type": "M"
+                },
+                {
+                  "name": "last.eq",
+                  "type": "N"
+                },
+                {
+                  "name": "last.ne",
+                  "type": "N"
+                },
+                {
+                  "name": "last.gt",
+                  "type": "N"
+                },
+                {
+                  "name": "last.ge",
+                  "type": "N"
+                },
+                {
+                  "name": "last.lt",
+                  "type": "N"
+                },
+                {
+                  "name": "last.le",
+                  "type": "N"
+                }
+              ],
+              "labels": {},
+              "nameFormat": "",
+              "readToken": "",
+              "reducer": null,
+              "reducerLabels": [],
+              "reducers": [
+                "argmax",
+                "argmin",
+                "count",
+                "count.exclude-nulls",
+                "count.include-nulls",
+                "join",
+                "join.forbid-nulls",
+                "max",
+                "max.forbid-nulls",
+                "mean",
+                "mean.exclude-nulls",
+                "mean.circular",
+                "mean.circular.exclude-nulls",
+                "median",
+                "min",
+                "min.forbid-nulls",
+                "and",
+                "and.exclude-nulls",
+                "or",
+                "or.exclude-nulls",
+                "sd",
+                "shannonentropy.0",
+                "shannonentropy.1",
+                "sum",
+                "sum.forbid-nulls",
+                "var"
+              ]
+            },
+            "refId": "A"
+          }
+        ],
+        "title": "Roadmap",
+        "transform": "table",
+        "type": "table"
+      },
+      {
+        "cacheTimeout": null,
+        "colorBackground": false,
+        "colorValue": false,
+        "colors": [
+          "#299c46",
+          "rgba(237, 129, 40, 0.89)",
+          "#d44a3a"
+        ],
+        "datasource": "Jerem",
+        "description": "in days",
+        "format": "none",
+        "gauge": {
+          "maxValue": 100,
+          "minValue": 0,
+          "show": false,
+          "thresholdLabels": false,
+          "thresholdMarkers": true
+        },
+        "gridPos": {
+          "h": 3,
+          "w": 2,
+          "x": 0,
+          "y": 4
+        },
+        "id": 98,
+        "interval": null,
+        "links": [],
+        "mappingType": 1,
+        "mappingTypes": [
+          {
+            "name": "value to text",
+            "value": 1
+          },
+          {
+            "name": "range to text",
+            "value": 2
+          }
+        ],
+        "maxDataPoints": 100,
+        "nullPointMode": "connected",
+        "nullText": null,
+        "options": {},
+        "postfix": "",
+        "postfixFontSize": "50%",
+        "prefix": "",
+        "prefixFontSize": "50%",
+        "rangeMaps": [
+          {
+            "from": "null",
+            "text": "N/A",
+            "to": "null"
+          }
+        ],
+        "sparkline": {
+          "fillColor": "rgba(31, 118, 189, 0.18)",
+          "full": false,
+          "lineColor": "rgb(31, 120, 193)",
+          "show": false
+        },
+        "tableColumn": "",
+        "targets": [
+          {
+            "advancedMode": true,
+            "expr": "[ $RTOKEN 'jerem.jira.sprint.events' { 'project' $project 'sprint' 'current' } $end -1 ] FETCH\n[ SWAP \"start\" mapper.eq 0 0 0 ] MAP NONEMPTY\n\n$end 'tick' STORE\n\n<% \n    DUP SIZE 0 >\n%>\n<%\n    0 GET LASTTICK 'tick' STORE\n%>\n<% \n    DROP\n%>\nIFTE\n\n[ $RTOKEN 'jerem.jira.sprint.storypoint.done' { 'project' $project 'sprint' '~.*' } $tick 1 h  ] FETCH\n\n{\n  'current' 1\n}\nSWAP\n\n<%\n    LABELS 'sprint' GET \n    1 SWAP\n    PUT\n%>\nFOREACH\n'sprintsToRemove' STORE\n\n[ $RTOKEN '~jerem.jira.sprint.storypoint.done' { 'project' $project 'sprint' '~.*' } $end -1  ] FETCH\n\n[]\nSWAP\n\n<% \n  DUP\n  LABELS 'sprint' GET\n  <%\n    $sprintsToRemove SWAP CONTAINSKEY\n  %>\n  <%\n    DROP DROP CONTINUE\n  %>\n  IFT\n  DROP\n  +\n%>\nFOREACH\n[ SWAP [] reducer.sum ] REDUCE\n[ SWAP mapper.todouble 0 0 0 ] MAP\n 0 GET\n10.0 /\n[ SWAP bucketizer.mean 0 0 1 ] BUCKETIZE 0 GET\nVALUES 0 GET 'velocity' STORE\n\n// Get current quarter 100% completion metrics\n[ $RTOKEN '~jerem.jira.epic.storypoint.*' { 'project' $project 'quarter' $activeQuarter } $end 1 h - $interval  ] FETCH DUP 'set' STORE\n\n<% \n  DROP\n  DUP\n  NAME 'name' STORE\n  {\n    'class' \n     $name\n  }\n  RELABEL\n%>\nLMAP\n[ SWAP [ 'class' 'key' ] reducer.max ] REDUCE\n[ SWAP [] bucketizer.last $end 0 1 ] BUCKETIZE \n'data' STORE\n[ \n    [ $data [] 'jerem.jira.epic.storypoint' filter.byclass ] FILTER\n    [ $data [] 'jerem.jira.epic.storypoint.done' filter.byclass ] FILTER \n [ 'key' ]\n  op.eq\n]\nAPPLY\n[ SWAP true mapper.eq 0 0 0 ] MAP\nNONEMPTY\n<% \n   DROP\n   LABELS 'key' GET\n%>\nLMAP \n'keys' STORE\n[ $set [] { 'key' '~' $keys '|' JOIN + }  filter.bylabels ] FILTER\n\n// Get current Metrics needed to be completed\n[ $RTOKEN '~jerem.jira.epic.*' { 'project' $project 'quarter' $activeQuarter } $end 1 h ] FETCH\nAPPEND\n\n<%\n    DROP\n    DUP NAME 'name' STORE\n    {\n        'class'\n        $name\n    }\n    RELABEL\n%> \nLMAP\n\n[ SWAP [ 'class' 'key' ] reducer.max ] REDUCE\n[ SWAP bucketizer.last $end 0 1 ] BUCKETIZE\n[ SWAP [ 'class' ] reducer.sum ] REDUCE\n{}\nSWAP\n<% \n    DUP \n    NAME\n    SWAP\n    VALUES 0 GET \n    SWAP\n    PUT\n%>\nFOREACH\n'stats' STORE\n\n$stats 'jerem.jira.epic.storypoint.done' GET TODOUBLE  'done' STORE\n$stats 'jerem.jira.epic.storypoint' GET TODOUBLE 'total' STORE\n\nNEWGTS \n$end NaN NaN NaN $total $done - TODOUBLE $velocity TODOUBLE / CEIL ADDVALUE",
+            "friendlyQuery": {
+              "bucketCount": 50,
+              "bucketizer": null,
+              "bucketizers": [
+                "sum",
+                "max",
+                "min",
+                "mean",
+                "mean.circular",
+                "bucketizer.mean.circular.exclude-nulls",
+                "first",
+                "last",
+                "join",
+                "median",
+                "count",
+                "and",
+                "or"
+              ],
+              "className": "",
+              "filter": null,
+              "filterLabels": [],
+              "filterParamClass": "",
+              "filterParamMap": {},
+              "filterParamNumber": 0,
+              "filters": [
+                {
+                  "name": "byclass",
+                  "type": "S"
+                },
+                {
+                  "name": "bylabels",
+                  "type": "M"
+                },
+                {
+                  "name": "last.eq",
+                  "type": "N"
+                },
+                {
+                  "name": "last.ne",
+                  "type": "N"
+                },
+                {
+                  "name": "last.gt",
+                  "type": "N"
+                },
+                {
+                  "name": "last.ge",
+                  "type": "N"
+                },
+                {
+                  "name": "last.lt",
+                  "type": "N"
+                },
+                {
+                  "name": "last.le",
+                  "type": "N"
+                }
+              ],
+              "labels": {},
+              "nameFormat": "",
+              "readToken": "",
+              "reducer": null,
+              "reducerLabels": [],
+              "reducers": [
+                "argmax",
+                "argmin",
+                "count",
+                "count.exclude-nulls",
+                "count.include-nulls",
+                "join",
+                "join.forbid-nulls",
+                "max",
+                "max.forbid-nulls",
+                "mean",
+                "mean.exclude-nulls",
+                "mean.circular",
+                "mean.circular.exclude-nulls",
+                "median",
+                "min",
+                "min.forbid-nulls",
+                "and",
+                "and.exclude-nulls",
+                "or",
+                "or.exclude-nulls",
+                "sd",
+                "shannonentropy.0",
+                "shannonentropy.1",
+                "sum",
+                "sum.forbid-nulls",
+                "var"
+              ]
+            },
+            "hideAttributes": true,
+            "hideLabels": true,
+            "refId": "A"
+          }
+        ],
+        "thresholds": "",
+        "title": "Time to complete all epics",
+        "type": "singlestat",
+        "valueFontSize": "80%",
+        "valueMaps": [
+          {
+            "op": "=",
+            "text": "N/A",
+            "value": "null"
+          }
+        ],
+        "valueName": "avg"
+      },
+      {
+        "cacheTimeout": null,
+        "colorBackground": false,
+        "colorValue": false,
+        "colors": [
+          "#299c46",
+          "rgba(237, 129, 40, 0.89)",
+          "#d44a3a"
+        ],
+        "datasource": "Jerem",
+        "description": "The working days left before the end of the current Quarter (using variable Quarter end date)",
+        "format": "none",
+        "gauge": {
+          "maxValue": 100,
+          "minValue": 0,
+          "show": false,
+          "thresholdLabels": false,
+          "thresholdMarkers": true
+        },
+        "gridPos": {
+          "h": 3,
+          "w": 2,
+          "x": 2,
+          "y": 4
+        },
+        "id": 94,
+        "interval": null,
+        "links": [],
+        "mappingType": 1,
+        "mappingTypes": [
+          {
+            "name": "value to text",
+            "value": 1
+          },
+          {
+            "name": "range to text",
+            "value": 2
+          }
+        ],
+        "maxDataPoints": 100,
+        "nullPointMode": "connected",
+        "nullText": null,
+        "options": {},
+        "postfix": "",
+        "postfixFontSize": "50%",
+        "prefix": "",
+        "prefixFontSize": "50%",
+        "rangeMaps": [
+          {
+            "from": "null",
+            "text": "N/A",
+            "to": "null"
+          }
+        ],
+        "sparkline": {
+          "fillColor": "rgba(31, 118, 189, 0.18)",
+          "full": false,
+          "lineColor": "rgb(31, 120, 193)",
+          "show": false
+        },
+        "tableColumn": "",
+        "targets": [
+          {
+            "advancedMode": true,
+            "expr": "$end ->TSELEMENTS 0 GET TOSTRING 'year' STORE\nNEWGTS 'notWorkingDay' RENAME 'notWorkingDay' STORE\n$nowork EVAL <% $year '-' + SWAP + 'T12:00:00.000000Z' + TOTIMESTAMP $notWorkingDay SWAP NaN NaN NaN 1 ADDVALUE 'notWorkingDay' STORE %> FOREACH\n$quarter 'T12:00:00.000000Z' + TOTIMESTAMP DUP 'endQuarterDate' STORE\n->TSELEMENTS DUP\n8 GET 'endQuarterDayOfTheWeek' STORE\n9 GET 'endQuarterWeek' STORE\n$end ->TSELEMENTS DUP\n\n8 GET 'nowDayOfTheWeek'  STORE \n\n// Remove saturday and sunday\n<% $nowDayOfTheWeek 5 > %>\n<% 5 'nowDayOfTheWeek' STORE  %>\nIFT \n9 GET 1 + 'nowWeek' STORE\n\n<% $endQuarterDate ->TSELEMENTS 0 GET TOSTRING $year != %>\n<% \n    $nowork EVAL \n    <% \n        $endQuarterDate ->TSELEMENTS 0 GET TOSTRING '-' + SWAP + 'T12:00:00.000000Z' + TOTIMESTAMP \n        $notWorkingDay SWAP NaN NaN NaN 1 ADDVALUE 'notWorkingDay' STORE \n    %> FOREACH\n    $endQuarterWeek 52 + 'endQuarterWeek' STORE\n%> \nIFT\n\n$endQuarterDayOfTheWeek $nowDayOfTheWeek -\n$endQuarterWeek $nowWeek - 1 + 5 *\n+\n'value' STORE\n$notWorkingDay [ [ $end $endQuarterDate ] ] CLIP \nNONEMPTY\n\n<% DUP SIZE 0 ==  %>\n<% DROP 0 'holidays' STORE %>\n<%\n    [ SWAP bucketizer.count 0 0 1 ] BUCKETIZE 0 GET VALUES 0 GET 'holidays' STORE\n%>\nIFTE\nNEWGTS \n$end NaN NaN NaN $value $holidays - ADDVALUE",
+            "friendlyQuery": {
+              "bucketCount": 50,
+              "bucketizer": null,
+              "bucketizers": [
+                "sum",
+                "max",
+                "min",
+                "mean",
+                "mean.circular",
+                "bucketizer.mean.circular.exclude-nulls",
+                "first",
+                "last",
+                "join",
+                "median",
+                "count",
+                "and",
+                "or"
+              ],
+              "className": "",
+              "filter": null,
+              "filterLabels": [],
+              "filterParamClass": "",
+              "filterParamMap": {},
+              "filterParamNumber": 0,
+              "filters": [
+                {
+                  "name": "byclass",
+                  "type": "S"
+                },
+                {
+                  "name": "bylabels",
+                  "type": "M"
+                },
+                {
+                  "name": "last.eq",
+                  "type": "N"
+                },
+                {
+                  "name": "last.ne",
+                  "type": "N"
+                },
+                {
+                  "name": "last.gt",
+                  "type": "N"
+                },
+                {
+                  "name": "last.ge",
+                  "type": "N"
+                },
+                {
+                  "name": "last.lt",
+                  "type": "N"
+                },
+                {
+                  "name": "last.le",
+                  "type": "N"
+                }
+              ],
+              "labels": {},
+              "readToken": "",
+              "reducer": null,
+              "reducerLabels": [],
+              "reducers": [
+                "argmax",
+                "argmin",
+                "count",
+                "count.exclude-nulls",
+                "count.include-nulls",
+                "join",
+                "join.forbid-nulls",
+                "max",
+                "max.forbid-nulls",
+                "mean",
+                "mean.exclude-nulls",
+                "mean.circular",
+                "mean.circular.exclude-nulls",
+                "median",
+                "min",
+                "min.forbid-nulls",
+                "and",
+                "and.exclude-nulls",
+                "or",
+                "or.exclude-nulls",
+                "sd",
+                "shannonentropy.0",
+                "shannonentropy.1",
+                "sum",
+                "sum.forbid-nulls",
+                "var"
+              ]
+            },
+            "hideAttributes": true,
+            "hideLabels": true,
+            "refId": "A"
+          }
+        ],
+        "thresholds": "",
+        "title": "Working days left",
+        "type": "singlestat",
+        "valueFontSize": "80%",
+        "valueMaps": [
+          {
+            "op": "=",
+            "text": "N/A",
+            "value": "null"
+          }
+        ],
+        "valueName": "avg"
+      },
+      {
+        "cacheTimeout": null,
+        "colorBackground": false,
+        "colorValue": false,
+        "colors": [
+          "#299c46",
+          "rgba(237, 129, 40, 0.89)",
+          "#d44a3a"
+        ],
+        "datasource": "Jerem",
+        "format": "percent",
+        "gauge": {
+          "maxValue": 100,
+          "minValue": 0,
+          "show": false,
+          "thresholdLabels": false,
+          "thresholdMarkers": true
+        },
+        "gridPos": {
+          "h": 3,
+          "w": 3,
+          "x": 4,
+          "y": 4
+        },
+        "id": 89,
+        "interval": null,
+        "links": [],
+        "mappingType": 1,
+        "mappingTypes": [
+          {
+            "name": "value to text",
+            "value": 1
+          },
+          {
+            "name": "range to text",
+            "value": 2
+          }
+        ],
+        "maxDataPoints": 100,
+        "nullPointMode": "connected",
+        "nullText": null,
+        "options": {},
+        "postfix": "",
+        "postfixFontSize": "50%",
+        "prefix": "",
+        "prefixFontSize": "50%",
+        "rangeMaps": [
+          {
+            "from": "null",
+            "text": "N/A",
+            "to": "null"
+          }
+        ],
+        "sparkline": {
+          "fillColor": "rgba(31, 118, 189, 0.18)",
+          "full": false,
+          "lineColor": "rgb(31, 120, 193)",
+          "show": false
+        },
+        "tableColumn": "",
+        "targets": [
+          {
+            "advancedMode": true,
+            "expr": "// Remove current sprints from computation\n[ $RTOKEN 'jerem.jira.sprint.storypoint.total' { 'project' $project 'sprint' 'current' } $end 1 h ] FETCH\n$end 'tick' STORE\n\n<% \n    DUP SIZE 0 >\n%>\n<%\n    0 GET LASTTICK 'tick' STORE\n%>\n<% \n    DROP\n%>\nIFTE\n\n[ $RTOKEN 'jerem.jira.sprint.storypoint.total' { 'project' $project 'sprint' '~.*' } $tick 1 h  ] FETCH\n\n{\n  'current' 1\n}\nSWAP\n\n<%\n    LABELS 'sprint' GET \n    1 SWAP\n    PUT\n%>\nFOREACH\n'sprintsToRemove' STORE\n\n[ $RTOKEN '~jerem.jira.sprint.storypoint.(total|done)' { 'project' $project 'sprint' '~.*' } $end -1  ] FETCH\n\n[]\nSWAP\n\n<% \n  DUP\n  LABELS 'sprint' GET\n  <%\n    $sprintsToRemove SWAP CONTAINSKEY\n  %>\n  <%\n    DROP DROP CONTINUE\n  %>\n  IFT\n  DROP\n  DUP\n  NAME 'name' STORE\n  {\n    'class' \n     $name\n  }\n  RELABEL +\n%>\nFOREACH\n[ SWAP [ 'class' ] reducer.sum ] REDUCE 'data' STORE\n\n\n[ $data [] 'jerem.jira.sprint.storypoint.done' filter.byclass ] FILTER \n[ SWAP   mapper.todouble 0 0 0 ] MAP\n0 GET\n     \n[ $data [] 'jerem.jira.sprint.storypoint.total' filter.byclass ] FILTER \n[ SWAP   mapper.todouble 0 0 0 ] MAP\n0 GET 100.0 /\n/\n\n[ SWAP bucketizer.mean 0 0 1 ] BUCKETIZE\n",
+            "friendlyQuery": {
+              "bucketCount": 50,
+              "bucketizer": null,
+              "bucketizers": [
+                "sum",
+                "max",
+                "min",
+                "mean",
+                "mean.circular",
+                "bucketizer.mean.circular.exclude-nulls",
+                "first",
+                "last",
+                "join",
+                "median",
+                "count",
+                "and",
+                "or"
+              ],
+              "className": "",
+              "filter": null,
+              "filterLabels": [],
+              "filterParamClass": "",
+              "filterParamMap": {},
+              "filterParamNumber": 0,
+              "filters": [
+                {
+                  "name": "byclass",
+                  "type": "S"
+                },
+                {
+                  "name": "bylabels",
+                  "type": "M"
+                },
+                {
+                  "name": "last.eq",
+                  "type": "N"
+                },
+                {
+                  "name": "last.ne",
+                  "type": "N"
+                },
+                {
+                  "name": "last.gt",
+                  "type": "N"
+                },
+                {
+                  "name": "last.ge",
+                  "type": "N"
+                },
+                {
+                  "name": "last.lt",
+                  "type": "N"
+                },
+                {
+                  "name": "last.le",
+                  "type": "N"
+                }
+              ],
+              "labels": {},
+              "readToken": "",
+              "reducer": null,
+              "reducerLabels": [],
+              "reducers": [
+                "argmax",
+                "argmin",
+                "count",
+                "count.exclude-nulls",
+                "count.include-nulls",
+                "join",
+                "join.forbid-nulls",
+                "max",
+                "max.forbid-nulls",
+                "mean",
+                "mean.exclude-nulls",
+                "mean.circular",
+                "mean.circular.exclude-nulls",
+                "median",
+                "min",
+                "min.forbid-nulls",
+                "and",
+                "and.exclude-nulls",
+                "or",
+                "or.exclude-nulls",
+                "sd",
+                "shannonentropy.0",
+                "shannonentropy.1",
+                "sum",
+                "sum.forbid-nulls",
+                "var"
+              ]
+            },
+            "hideAttributes": true,
+            "hideLabels": true,
+            "refId": "A"
+          }
+        ],
+        "thresholds": "",
+        "title": "Average sprint completion",
+        "type": "singlestat",
+        "valueFontSize": "80%",
+        "valueMaps": [
+          {
+            "op": "=",
+            "text": "N/A",
+            "value": "null"
+          }
+        ],
+        "valueName": "avg"
+      },
+      {
+        "cacheTimeout": null,
+        "colorBackground": false,
+        "colorPostfix": false,
+        "colorPrefix": false,
+        "colorValue": false,
+        "colors": [
+          "#f29191",
+          "#f2c96d",
+          "#7eb26d"
+        ],
+        "datasource": "Jerem",
+        "format": "none",
+        "gauge": {
+          "maxValue": 100,
+          "minValue": 0,
+          "show": false,
+          "thresholdLabels": false,
+          "thresholdMarkers": true
+        },
+        "gridPos": {
+          "h": 3,
+          "w": 3,
+          "x": 7,
+          "y": 4
+        },
+        "id": 107,
+        "interval": null,
+        "links": [],
+        "mappingType": 1,
+        "mappingTypes": [
+          {
+            "name": "value to text",
+            "value": 1
+          },
+          {
+            "name": "range to text",
+            "value": 2
+          }
+        ],
+        "maxDataPoints": 100,
+        "nullPointMode": "connected",
+        "nullText": null,
+        "options": {},
+        "postfix": "",
+        "postfixFontSize": "50%",
+        "prefix": "",
+        "prefixFontSize": "50%",
+        "rangeMaps": [
+          {
+            "from": "null",
+            "text": "N/A",
+            "to": "null"
+          }
+        ],
+        "sparkline": {
+          "fillColor": "rgba(31, 118, 189, 0.18)",
+          "full": false,
+          "lineColor": "rgb(31, 120, 193)",
+          "show": true
+        },
+        "tableColumn": "",
+        "targets": [
+          {
+            "advancedMode": true,
+            "expr": "// Get current quarter 100% completion metrics\n[ $RTOKEN '~jerem.jira.epic.storypoint.*' { 'project' $project 'quarter' $activeQuarter } $end 1 h - $interval  ] FETCH DUP 'set' STORE\n\n<% \n  DROP\n  DUP\n  NAME 'name' STORE\n  {\n    'class' \n     $name\n  }\n  RELABEL\n%>\nLMAP\n[ SWAP [ 'class' 'key' ] reducer.max ] REDUCE\n[ SWAP [] bucketizer.last $end 0 1 ] BUCKETIZE \n'data' STORE\n[ \n    [ $data [] 'jerem.jira.epic.storypoint' filter.byclass ] FILTER\n    [ $data [] 'jerem.jira.epic.storypoint.done' filter.byclass ] FILTER \n [ 'key' ]\n  op.eq\n]\nAPPLY\n[ SWAP true mapper.eq 0 0 0 ] MAP\nNONEMPTY\n<% \n   DROP\n   LABELS 'key' GET\n%>\nLMAP \n'keys' STORE\n[ $set [] { 'key' '~' $keys '|' JOIN + }  filter.bylabels ] FILTER\n\n// Get current Metrics needed to be completed\n[ $RTOKEN '~jerem.jira.epic.storypoint.*' { 'project' $project 'quarter' $activeQuarter } $end 1 h  ] FETCH\nAPPEND\n\n[]\nSWAP\n\n<% \n  DUP\n  NAME 'name' STORE\n  {\n    'class' \n     $name\n  }\n  RELABEL +\n%>\nFOREACH\n\n\n[ SWAP [ 'class' 'key' ] reducer.max ] REDUCE\n[ SWAP [] bucketizer.last $end 0 1 ] BUCKETIZE \n\n[ SWAP [ 'class' ] reducer.sum ] REDUCE 'data' STORE\n\n[ $data [] 'jerem.jira.epic.storypoint' filter.byclass ] FILTER \n[ SWAP   mapper.todouble 0 0 0 ] MAP\n0 GET \n     \n[ $data [] 'jerem.jira.epic.storypoint.done' filter.byclass ] FILTER \n[ SWAP   mapper.todouble 0 0 0 ] MAP\n0 GET -\n\n[ SWAP bucketizer.last 0 0 1 ] BUCKETIZE",
+            "friendlyQuery": {
+              "bucketCount": 50,
+              "bucketizer": null,
+              "bucketizers": [
+                "sum",
+                "max",
+                "min",
+                "mean",
+                "mean.circular",
+                "bucketizer.mean.circular.exclude-nulls",
+                "first",
+                "last",
+                "join",
+                "median",
+                "count",
+                "and",
+                "or"
+              ],
+              "className": "",
+              "filter": null,
+              "filterLabels": [],
+              "filterParamClass": "",
+              "filterParamMap": {},
+              "filterParamNumber": 0,
+              "filters": [
+                {
+                  "name": "byclass",
+                  "type": "S"
+                },
+                {
+                  "name": "bylabels",
+                  "type": "M"
+                },
+                {
+                  "name": "last.eq",
+                  "type": "N"
+                },
+                {
+                  "name": "last.ne",
+                  "type": "N"
+                },
+                {
+                  "name": "last.gt",
+                  "type": "N"
+                },
+                {
+                  "name": "last.ge",
+                  "type": "N"
+                },
+                {
+                  "name": "last.lt",
+                  "type": "N"
+                },
+                {
+                  "name": "last.le",
+                  "type": "N"
+                }
+              ],
+              "labels": {},
+              "nameFormat": "",
+              "readToken": "",
+              "reducer": null,
+              "reducerLabels": [],
+              "reducers": [
+                "argmax",
+                "argmin",
+                "count",
+                "count.exclude-nulls",
+                "count.include-nulls",
+                "join",
+                "join.forbid-nulls",
+                "max",
+                "max.forbid-nulls",
+                "mean",
+                "mean.exclude-nulls",
+                "mean.circular",
+                "mean.circular.exclude-nulls",
+                "median",
+                "min",
+                "min.forbid-nulls",
+                "and",
+                "and.exclude-nulls",
+                "or",
+                "or.exclude-nulls",
+                "sd",
+                "shannonentropy.0",
+                "shannonentropy.1",
+                "sum",
+                "sum.forbid-nulls",
+                "var"
+              ]
+            },
+            "hideAttributes": true,
+            "hideLabels": true,
+            "refId": "A"
+          }
+        ],
+        "thresholds": "",
+        "title": "Story Points remaining",
+        "type": "singlestat",
+        "valueFontSize": "80%",
+        "valueMaps": [
+          {
+            "op": "=",
+            "text": "N/A",
+            "value": "null"
+          }
+        ],
+        "valueName": "avg"
+      },
+      {
+        "columns": [],
+        "datasource": "Jerem",
+        "description": "week by week (with at most Weeks param in history)",
+        "fontSize": "100%",
+        "gridPos": {
+          "h": 12,
+          "w": 10,
+          "x": 0,
+          "y": 7
+        },
+        "id": 106,
+        "links": [],
+        "options": {},
+        "pageSize": null,
+        "scroll": true,
+        "showHeader": true,
+        "sort": {
+          "col": 0,
+          "desc": true
+        },
+        "styles": [
+          {
+            "alias": "",
+            "colorMode": null,
+            "colors": [
+              "rgba(245, 54, 54, 0.9)",
+              "rgba(237, 129, 40, 0.89)",
+              "rgba(50, 172, 45, 0.97)"
+            ],
+            "decimals": 0,
+            "link": false,
+            "pattern": "WEEKS",
+            "thresholds": [],
+            "type": "number",
+            "unit": "short"
+          },
+          {
+            "alias": "",
+            "colorMode": "cell",
+            "colors": [
+              "#b7dbab",
+              "#f9ba8f",
+              "#f29191"
+            ],
+            "dateFormat": "YYYY-MM-DD HH:mm:ss",
+            "decimals": 2,
+            "mappingType": 1,
+            "pattern": "/Impediment.*duration/",
+            "thresholds": [
+              "120000",
+              "220000"
+            ],
+            "type": "number",
+            "unit": "dthms"
+          },
+          {
+            "alias": "",
+            "colorMode": "cell",
+            "colors": [
+              "#b7dbab",
+              "#f9ba8f",
+              "#f29191"
+            ],
+            "dateFormat": "YYYY-MM-DD HH:mm:ss",
+            "decimals": 2,
+            "mappingType": 1,
+            "pattern": "/Delta.*/",
+            "thresholds": [
+              "1",
+              "20"
+            ],
+            "type": "number",
+            "unit": "short"
+          },
+          {
+            "alias": "",
+            "colorMode": "cell",
+            "colors": [
+              "#b7dbab",
+              "#f9ba8f",
+              "#f29191"
+            ],
+            "dateFormat": "YYYY-MM-DD HH:mm:ss",
+            "decimals": 2,
+            "mappingType": 1,
+            "pattern": "/Impediment.*count/",
+            "thresholds": [
+              "5",
+              "20"
+            ],
+            "type": "number",
+            "unit": "short"
+          },
+          {
+            "alias": "",
+            "colorMode": "cell",
+            "colors": [
+              "#f29191",
+              "#f9ba8f",
+              "#b7dbab"
+            ],
+            "dateFormat": "YYYY-MM-DD HH:mm:ss",
+            "decimals": 2,
+            "mappingType": 1,
+            "pattern": "Epic completion",
+            "thresholds": [
+              "10",
+              " 30"
+            ],
+            "type": "number",
+            "unit": "short"
+          },
+          {
+            "alias": "",
+            "colorMode": null,
+            "colors": [
+              "rgba(245, 54, 54, 0.9)",
+              "rgba(237, 129, 40, 0.89)",
+              "rgba(50, 172, 45, 0.97)"
+            ],
+            "decimals": 2,
+            "pattern": "/.*/",
+            "thresholds": [],
+            "type": "number",
+            "unit": "short"
+          }
+        ],
+        "targets": [
+          {
+            "advancedMode": true,
+            "expr": "$RTOKEN AUTHENTICATE\n$weeks TOLONG 'weeks' STORE\n4000000 LIMIT\n\n$end ->TSELEMENTS \n<%\n    'i' STORE\n    <% $i 3 == $i 4 == || $i 5 == || $i 6 == || %>\n    <% DROP 0 %>\n    IFT\n    <% $i 8 == %>\n    <% DUP 'date' STORE %>\n    IFT\n%>\nLMAP\nTSELEMENTS-> 1 s - 8 $date - d +\n'endBucketize' STORE\n\n[ $RTOKEN '~jerem.jira.epic.*' { 'project' $project 'quarter' $activeQuarter } $end $weeks 1 + w  ] FETCH\n\n\n[]\nSWAP\n\n<% \n  DUP\n  NAME 'name' STORE\n  {\n    'class' \n     $name\n  }\n  RELABEL +\n%>\nFOREACH\n[ SWAP  [ 'class' 'key' ] reducer.max ] REDUCE\n[ SWAP bucketizer.last $endBucketize 1 w $weeks ] BUCKETIZE [ NaN NaN NaN 0 ] FILLVALUE\n[ SWAP [ 'class' ] reducer.sum ] REDUCE  \n\n'data' STORE \n\n\n[ $data [] 'jerem.jira.epic.storypoint.done' filter.byclass ] FILTER  \n[ SWAP   mapper.todouble 0 0 0 ] MAP\n0 GET\n     \n[ $data [] 'jerem.jira.epic.storypoint' filter.byclass ] FILTER \n[ SWAP   mapper.todouble 0 0 0 ] MAP\n0 GET 100.0 /\n/\nSORT\n[ SWAP mapper.finite 0 0 0 ] MAP [ NaN NaN NaN 0 ] FILLVALUE\n0 GET\n'result' STORE\n\n[\n\n  [ $RTOKEN 'jerem.jira.impediment.total.created' { 'project' $project 'type' 'daily' } $end $weeks 1 + w  ] FETCH\n  <% DUP SIZE 0 == %> <% NEWGTS 'jerem.jira.impediment.total.created' RENAME { 'project' $project 'type' 'daily' } RELABEL + %> IFT\n  [ SWAP bucketizer.count $endBucketize 1 w $weeks ] BUCKETIZE [ NaN NaN NaN 0 ] FILLVALUE\n  [ $result 0 mapper.replace 0 0 0 ] MAP\n  []\n  op.add\n]\nAPPLY \n0 GET 'countImpediment' STORE\n\n[\n\n  [ $RTOKEN 'jerem.jira.impediment.total.created' { 'project' $project 'type' 'daily' } $end $weeks 1 + w  ] FETCH\n  <% DUP SIZE 0 == %> <% NEWGTS 'jerem.jira.impediment.total.created' RENAME { 'project' $project 'type' 'daily' } RELABEL + %> IFT\n  [ SWAP bucketizer.sum $endBucketize 1 w $weeks ] BUCKETIZE [ NaN NaN NaN 0 ] FILLVALUE\n  [ $result 0 mapper.replace 0 0 0 ] MAP  \n  []\n  op.add\n]\nAPPLY\n0 GET 'countDuration' STORE\n\n[ $data [] 'jerem.jira.epic.storypoint' filter.byclass ] FILTER \n[ SWAP   mapper.delta 1 0 0 ] MAP\n0 GET\n'delta' STORE\n\n[ \n  {\n    'text' 'WEEKS'\n    'type' 'string'\n  }\n  {\n    'text' 'Epic completion'\n    'type' 'number'\n  }\n  {\n    'text' 'Impediment count'\n    'type' 'number'\n  }\n  {\n    'text' 'Impediment duration'\n    'type' 'number'\n  }\n  {\n    'text' 'Delta story point planed'\n    'type' 'number'\n  }\n]\n\n'columns' STORE\n\n[] 'rows' STORE\n\n$result TICKS\n<%\n    'index' STORE\n    'tick' STORE\n    $rows \n    [ \n        $tick ->TSELEMENTS 9 GET  \n        $result VALUES $index GET  \n        $countImpediment VALUES  $index GET\n        $countDuration VALUES $index GET\n        $delta VALUES $index GET\n    ] + 'rows' STORE\n    0\n%>\nLMAP\nDROP\n\n{\n  'columns' $columns\n  'rows' $rows\n}",
+            "friendlyQuery": {
+              "bucketCount": 50,
+              "bucketizer": null,
+              "bucketizers": [
+                "sum",
+                "max",
+                "min",
+                "mean",
+                "mean.circular",
+                "bucketizer.mean.circular.exclude-nulls",
+                "first",
+                "last",
+                "join",
+                "median",
+                "count",
+                "and",
+                "or"
+              ],
+              "className": "",
+              "filter": null,
+              "filterLabels": [],
+              "filterParamClass": "",
+              "filterParamMap": {},
+              "filterParamNumber": 0,
+              "filters": [
+                {
+                  "name": "byclass",
+                  "type": "S"
+                },
+                {
+                  "name": "bylabels",
+                  "type": "M"
+                },
+                {
+                  "name": "last.eq",
+                  "type": "N"
+                },
+                {
+                  "name": "last.ne",
+                  "type": "N"
+                },
+                {
+                  "name": "last.gt",
+                  "type": "N"
+                },
+                {
+                  "name": "last.ge",
+                  "type": "N"
+                },
+                {
+                  "name": "last.lt",
+                  "type": "N"
+                },
+                {
+                  "name": "last.le",
+                  "type": "N"
+                }
+              ],
+              "labels": {},
+              "nameFormat": "",
+              "readToken": "",
+              "reducer": null,
+              "reducerLabels": [],
+              "reducers": [
+                "argmax",
+                "argmin",
+                "count",
+                "count.exclude-nulls",
+                "count.include-nulls",
+                "join",
+                "join.forbid-nulls",
+                "max",
+                "max.forbid-nulls",
+                "mean",
+                "mean.exclude-nulls",
+                "mean.circular",
+                "mean.circular.exclude-nulls",
+                "median",
+                "min",
+                "min.forbid-nulls",
+                "and",
+                "and.exclude-nulls",
+                "or",
+                "or.exclude-nulls",
+                "sd",
+                "shannonentropy.0",
+                "shannonentropy.1",
+                "sum",
+                "sum.forbid-nulls",
+                "var"
+              ]
+            },
+            "hideAttributes": true,
+            "hideLabels": true,
+            "refId": "A"
+          }
+        ],
+        "timeFrom": null,
+        "timeShift": null,
+        "title": "Quarter completion",
+        "transform": "table",
+        "type": "table"
+      },
+      {
+        "aliasColors": {},
+        "bars": false,
+        "dashLength": 10,
+        "dashes": false,
+        "datasource": "Jerem",
+        "fill": 1,
+        "fillGradient": 0,
+        "gridPos": {
+          "h": 6,
+          "w": 14,
+          "x": 10,
+          "y": 7
+        },
+        "hiddenSeries": false,
+        "hideTimeOverride": false,
+        "id": 102,
+        "legend": {
+          "alignAsTable": false,
+          "avg": false,
+          "current": true,
+          "max": false,
+          "min": false,
+          "rightSide": false,
+          "show": true,
+          "total": false,
+          "values": true
+        },
+        "lines": true,
+        "linewidth": 1,
+        "links": [],
+        "nullPointMode": "null",
+        "options": {
+          "dataLinks": []
+        },
+        "percentage": false,
+        "pointradius": 5,
+        "points": false,
+        "renderer": "flot",
+        "seriesOverrides": [
+          {
+            "alias": "Q3-19",
+            "points": true
+          },
+          {
+            "alias": "/.*/",
+            "points": true
+          }
+        ],
+        "spaceLength": 10,
+        "stack": false,
+        "steppedLine": false,
+        "targets": [
+          {
+            "advancedMode": true,
+            "expr": "$RTOKEN AUTHENTICATE\n4000000 LIMIT\n\n$end ->TSELEMENTS \n<%\n    'i' STORE\n    <% $i 3 == $i 4 == || $i 5 == || $i 6 == || %>\n    <% DROP 0 %>\n    IFT\n    <% $i 8 == %>\n    <% DUP 'date' STORE %>\n    IFT\n%>\nLMAP\nTSELEMENTS-> 1 s - 8 $date - d +\n'endBucketize' STORE\n\n[ $RTOKEN '~jerem.jira.epic.*' { 'project' $project 'quarter' $activeQuarter } $end $interval  ] FETCH\n\n\n[]\nSWAP\n\n<% \n  DUP\n  NAME 'name' STORE\n  {\n    'class' \n     $name\n  }\n  RELABEL +\n%>\nFOREACH\n[ SWAP  [ 'class' 'key' ] reducer.max ] REDUCE\n[ SWAP bucketizer.last $endBucketize 1 w $interval 1 w / 2 + ] BUCKETIZE [ NaN NaN NaN 0 ] FILLVALUE\n[ SWAP [ 'class' ] reducer.sum ] REDUCE  \n\n'data' STORE \n\n\n[ $data [] 'jerem.jira.epic.storypoint.done' filter.byclass ] FILTER  \n[ SWAP   mapper.todouble 0 0 0 ] MAP\n0 GET\n     \n[ $data [] 'jerem.jira.epic.storypoint' filter.byclass ] FILTER \n[ SWAP   mapper.todouble 0 0 0 ] MAP\n0 GET 100.0 /\n/\nSORT\n[ SWAP mapper.finite 0 0 0 ] MAP [ NaN NaN NaN 0 ] FILLVALUE SORT\n$activeQuarter RENAME ",
+            "friendlyQuery": {
+              "bucketCount": 50,
+              "bucketizer": null,
+              "bucketizers": [
+                "sum",
+                "max",
+                "min",
+                "mean",
+                "mean.circular",
+                "bucketizer.mean.circular.exclude-nulls",
+                "first",
+                "last",
+                "join",
+                "median",
+                "count",
+                "and",
+                "or"
+              ],
+              "className": "",
+              "filter": null,
+              "filterLabels": [],
+              "filterParamClass": "",
+              "filterParamMap": {},
+              "filterParamNumber": 0,
+              "filters": [
+                {
+                  "name": "byclass",
+                  "type": "S"
+                },
+                {
+                  "name": "bylabels",
+                  "type": "M"
+                },
+                {
+                  "name": "last.eq",
+                  "type": "N"
+                },
+                {
+                  "name": "last.ne",
+                  "type": "N"
+                },
+                {
+                  "name": "last.gt",
+                  "type": "N"
+                },
+                {
+                  "name": "last.ge",
+                  "type": "N"
+                },
+                {
+                  "name": "last.lt",
+                  "type": "N"
+                },
+                {
+                  "name": "last.le",
+                  "type": "N"
+                }
+              ],
+              "labels": {},
+              "nameFormat": "",
+              "readToken": "",
+              "reducer": null,
+              "reducerLabels": [],
+              "reducers": [
+                "argmax",
+                "argmin",
+                "count",
+                "count.exclude-nulls",
+                "count.include-nulls",
+                "join",
+                "join.forbid-nulls",
+                "max",
+                "max.forbid-nulls",
+                "mean",
+                "mean.exclude-nulls",
+                "mean.circular",
+                "mean.circular.exclude-nulls",
+                "median",
+                "min",
+                "min.forbid-nulls",
+                "and",
+                "and.exclude-nulls",
+                "or",
+                "or.exclude-nulls",
+                "sd",
+                "shannonentropy.0",
+                "shannonentropy.1",
+                "sum",
+                "sum.forbid-nulls",
+                "var"
+              ]
+            },
+            "hideAttributes": true,
+            "hideLabels": true,
+            "refId": "A"
+          }
+        ],
+        "thresholds": [],
+        "timeFrom": null,
+        "timeRegions": [],
+        "timeShift": null,
+        "title": "Weekly Roadmap Quarter Completion",
+        "tooltip": {
+          "shared": true,
+          "sort": 0,
+          "value_type": "individual"
+        },
+        "type": "graph",
+        "xaxis": {
+          "buckets": null,
+          "mode": "time",
+          "name": null,
+          "show": true,
+          "values": []
+        },
+        "yaxes": [
+          {
+            "format": "percent",
+            "label": null,
+            "logBase": 1,
+            "max": null,
+            "min": null,
+            "show": true
+          },
+          {
+            "format": "dateTimeAsUS",
+            "label": null,
+            "logBase": 1,
+            "max": null,
+            "min": null,
+            "show": false
+          }
+        ],
+        "yaxis": {
+          "align": false,
+          "alignLevel": 0
+        }
+      },
+      {
+        "aliasColors": {},
+        "bars": false,
+        "dashLength": 10,
+        "dashes": false,
+        "datasource": "Jerem",
+        "fill": 1,
+        "fillGradient": 0,
+        "gridPos": {
+          "h": 6,
+          "w": 14,
+          "x": 10,
+          "y": 13
+        },
+        "hiddenSeries": false,
+        "id": 103,
+        "legend": {
+          "alignAsTable": false,
+          "avg": false,
+          "current": true,
+          "max": false,
+          "min": false,
+          "rightSide": false,
+          "show": true,
+          "total": false,
+          "values": true
+        },
+        "lines": true,
+        "linewidth": 1,
+        "links": [],
+        "nullPointMode": "null",
+        "options": {
+          "dataLinks": []
+        },
+        "percentage": false,
+        "pointradius": 5,
+        "points": false,
+        "renderer": "flot",
+        "seriesOverrides": [
+          {
+            "alias": "PLANED",
+            "points": true
+          },
+          {
+            "alias": "DONE",
+            "points": true
+          },
+          {
+            "alias": "limit",
+            "color": "#bf1b00",
+            "dashes": true,
+            "fill": 0,
+            "linewidth": 1
+          }
+        ],
+        "spaceLength": 10,
+        "stack": false,
+        "steppedLine": false,
+        "targets": [
+          {
+            "advancedMode": true,
+            "expr": "$RTOKEN AUTHENTICATE\n4000000 LIMIT\n\n$end ->TSELEMENTS \n<%\n    'i' STORE\n    <% $i 3 == $i 4 == || $i 5 == || $i 6 == || %>\n    <% DROP 0 %>\n    IFT\n    <% $i 8 == %>\n    <% DUP 'date' STORE %>\n    IFT\n%>\nLMAP\nTSELEMENTS-> 1 s - 8 $date - d +\n'endBucketize' STORE\n\n[ $RTOKEN '~jerem.jira.epic.*' { 'project' $project 'quarter' $activeQuarter } $end $interval  ] FETCH\n\n\n[]\nSWAP\n\n<% \n  DUP\n  NAME 'name' STORE\n  {\n    'class' \n     $name\n  }\n  RELABEL +\n%>\nFOREACH\n[ SWAP  [ 'class' 'key' ] reducer.max ] REDUCE\n[ SWAP bucketizer.last $endBucketize 1 w $interval 1 w / 2 + ] BUCKETIZE\n[ NaN NaN NaN 0 ] FILLVALUE\n[ SWAP [ 'class' ] reducer.sum ] REDUCE  \n\n'data' STORE \n\n\n[ $data [] 'jerem.jira.epic.storypoint.done' filter.byclass ] FILTER  \n[ SWAP   mapper.todouble 0 0 0 ] MAP\n0 GET\n'DONE' RENAME\n     \n[ $data [] 'jerem.jira.epic.storypoint' filter.byclass ] FILTER \n[ SWAP   mapper.todouble 0 0 0 ] MAP\n0 GET\n'PLANED' RENAME\n\n\n\n// LIMIT\n\n\n\n// Remove current sprints from computation\n[ $RTOKEN 'jerem.jira.sprint.storypoint.done' { 'project' $project 'sprint' 'current' } $end 1 h ] FETCH\n$end 'tick' STORE\n\n<% DUP SIZE 0 > %>\n<%\n    0 GET LASTTICK 'tick' STORE\n%>\n<% \n    DROP\n%>\nIFTE\n\n[ $RTOKEN 'jerem.jira.sprint.storypoint.done' { 'project' $project 'sprint' '~.*' } $tick 1 h  ] FETCH\n\n{\n  'current' 1\n}\nSWAP\n\n<%\n    LABELS 'sprint' GET \n    1 SWAP\n    PUT\n%>\nFOREACH\n'sprintsToRemove' STORE\n\n[ $RTOKEN '~jerem.jira.sprint.storypoint.done' { 'project' $project 'sprint' '~.*' } $end -1  ] FETCH\n\n[]\nSWAP\n\n<% \n  DUP\n  LABELS 'sprint' GET\n  <%\n    $sprintsToRemove SWAP CONTAINSKEY\n  %>\n  <%\n    DROP DROP CONTINUE\n  %>\n  IFT\n  DROP\n  +\n%>\nFOREACH\n[ SWAP [] reducer.sum ] REDUCE\n[ SWAP mapper.todouble 0 0 0 ] MAP\n 0 GET\n10.0 /\n[ SWAP bucketizer.mean 0 0 1 ] BUCKETIZE\n[ SWAP bucketizer.mean 0 0 1 ] BUCKETIZE 0 GET VALUES\n<% DUP SIZE 1 != %>\n  <% DROP [ 0 ] %>\nIFT 0 GET\n\n90 *\n$security_coef TODOUBLE 100.0 / 1.0 SWAP - *\n\n'limitV' STORE\nNEWGTS \n  'limit' RENAME\n  $start NaN DUP DUP $limitV ADDVALUE\n  $end NaN DUP DUP $limitV ADDVALUE",
+            "friendlyQuery": {
+              "bucketCount": 50,
+              "bucketizer": null,
+              "bucketizers": [
+                "sum",
+                "max",
+                "min",
+                "mean",
+                "mean.circular",
+                "bucketizer.mean.circular.exclude-nulls",
+                "first",
+                "last",
+                "join",
+                "median",
+                "count",
+                "and",
+                "or"
+              ],
+              "className": "",
+              "filter": null,
+              "filterLabels": [],
+              "filterParamClass": "",
+              "filterParamMap": {},
+              "filterParamNumber": 0,
+              "filters": [
+                {
+                  "name": "byclass",
+                  "type": "S"
+                },
+                {
+                  "name": "bylabels",
+                  "type": "M"
+                },
+                {
+                  "name": "last.eq",
+                  "type": "N"
+                },
+                {
+                  "name": "last.ne",
+                  "type": "N"
+                },
+                {
+                  "name": "last.gt",
+                  "type": "N"
+                },
+                {
+                  "name": "last.ge",
+                  "type": "N"
+                },
+                {
+                  "name": "last.lt",
+                  "type": "N"
+                },
+                {
+                  "name": "last.le",
+                  "type": "N"
+                }
+              ],
+              "labels": {},
+              "nameFormat": "",
+              "readToken": "",
+              "reducer": null,
+              "reducerLabels": [],
+              "reducers": [
+                "argmax",
+                "argmin",
+                "count",
+                "count.exclude-nulls",
+                "count.include-nulls",
+                "join",
+                "join.forbid-nulls",
+                "max",
+                "max.forbid-nulls",
+                "mean",
+                "mean.exclude-nulls",
+                "mean.circular",
+                "mean.circular.exclude-nulls",
+                "median",
+                "min",
+                "min.forbid-nulls",
+                "and",
+                "and.exclude-nulls",
+                "or",
+                "or.exclude-nulls",
+                "sd",
+                "shannonentropy.0",
+                "shannonentropy.1",
+                "sum",
+                "sum.forbid-nulls",
+                "var"
+              ]
+            },
+            "hideAttributes": true,
+            "hideLabels": true,
+            "refId": "A"
+          }
+        ],
+        "thresholds": [],
+        "timeFrom": null,
+        "timeRegions": [],
+        "timeShift": null,
+        "title": "RoadMap burnup",
+        "tooltip": {
+          "shared": true,
+          "sort": 0,
+          "value_type": "individual"
+        },
+        "type": "graph",
+        "xaxis": {
+          "buckets": null,
+          "mode": "time",
+          "name": null,
+          "show": true,
+          "values": []
+        },
+        "yaxes": [
+          {
+            "format": "short",
+            "label": null,
+            "logBase": 1,
+            "max": null,
+            "min": null,
+            "show": true
+          },
+          {
+            "format": "dateTimeAsUS",
+            "label": null,
+            "logBase": 1,
+            "max": null,
+            "min": null,
+            "show": false
+          }
+        ],
+        "yaxis": {
+          "align": false,
+          "alignLevel": 0
+        }
+      },
+      {
+        "collapsed": false,
+        "datasource": null,
+        "gridPos": {
+          "h": 1,
+          "w": 24,
+          "x": 0,
+          "y": 19
+        },
+        "id": 69,
+        "panels": [],
+        "title": "Active sprint data",
+        "type": "row"
+      },
+      {
+        "backgroundColor": "rgba(128,128,128,0.1)",
+        "colorMaps": [
+          {
+            "color": "#CCC",
+            "text": "N/A"
+          },
+          {
+            "color": "#00a1f1",
+            "text": "TODO"
+          },
+          {
+            "color": "#ffbb00",
+            "text": "DOING"
+          },
+          {
+            "color": "#7cbb00",
+            "text": "DONE"
+          }
+        ],
+        "crosshairColor": "#8F070C",
+        "datasource": "Jerem",
+        "display": "timeline",
+        "expandFromQueryS": 0,
+        "extendLastValue": true,
+        "gridPos": {
+          "h": 2,
+          "w": 24,
+          "x": 0,
+          "y": 20
+        },
+        "highlightOnMouseover": false,
+        "id": 60,
+        "legendPercentDecimals": 0,
+        "legendSortBy": "-ms",
+        "lineColor": "rgba(0,0,0,0.1)",
+        "links": [],
+        "metricNameColor": "#000000",
+        "options": {},
+        "rangeMaps": [
+          {
+            "from": "null",
+            "text": "N/A",
+            "to": "null"
+          }
+        ],
+        "rowHeight": 15,
+        "showDistinctCount": false,
+        "showLegend": true,
+        "showLegendNames": false,
+        "showLegendPercent": true,
+        "showLegendTime": false,
+        "showLegendValues": true,
+        "showTimeAxis": false,
+        "showTransitionCount": false,
+        "targets": [
+          {
+            "advancedMode": true,
+            "expr": "0 'shift' STORE\n<% \n   $sprint 'current' !=\n%>\n<%\n  [ $RTOKEN '~jerem.jira.sprint.storypoint.done' { 'project' $project 'sprint' $sprint } $end -1 ] FETCH \n  <% DUP SIZE 0 > %>\n  <% \n     0 GET TICKS 0 GET\n     DUP $end - ABS 'shift' STORE\n     'end' STORE\n     \n  %>\n  IFT\n%>\nIFT\n\n[ $RTOKEN '~jerem.jira.sprint.storypoint.*' { 'project' $project 'sprint' $sprint } $end 1 h ] FETCH\n[ SWAP bucketizer.last $end 0 1 ] BUCKETIZE \n$shift TIMESHIFT\n{} SWAP\n<%\n  DUP NAME '.' SPLIT DUP SIZE 1 - GET SWAP DUP LASTTICK ATTICK 4 GET 2 ->MAP APPEND\n%> FOREACH\n'stats' STORE\n\n$stats 'inprogress' GET TODOUBLE 'doing' STORE\n$stats 'done' GET TODOUBLE 'done' STORE\n$stats 'total' GET TODOUBLE 'total' STORE\n$total $done - $doing - 'todo' STORE\n\nNEWGTS 'a' RENAME \n$start NaN DUP DUP \"TODO\" ADDVALUE\n$start $interval TODOUBLE $todo TODOUBLE $total TODOUBLE / * + NaN DUP DUP \"DOING\" ADDVALUE\n$start $interval TODOUBLE $todo $doing + TODOUBLE $total TODOUBLE / * + NaN DUP DUP \"DONE\" ADDVALUE\n// TODO WIP DONE",
+            "friendlyQuery": {
+              "bucketCount": 50,
+              "bucketizer": null,
+              "bucketizers": [
+                "sum",
+                "max",
+                "min",
+                "mean",
+                "mean.circular",
+                "bucketizer.mean.circular.exclude-nulls",
+                "first",
+                "last",
+                "join",
+                "median",
+                "count",
+                "and",
+                "or"
+              ],
+              "className": "",
+              "filter": null,
+              "filterLabels": [],
+              "filterParamClass": "",
+              "filterParamMap": {},
+              "filterParamNumber": 0,
+              "filters": [
+                {
+                  "name": "byclass",
+                  "type": "S"
+                },
+                {
+                  "name": "bylabels",
+                  "type": "M"
+                },
+                {
+                  "name": "last.eq",
+                  "type": "N"
+                },
+                {
+                  "name": "last.ne",
+                  "type": "N"
+                },
+                {
+                  "name": "last.gt",
+                  "type": "N"
+                },
+                {
+                  "name": "last.ge",
+                  "type": "N"
+                },
+                {
+                  "name": "last.lt",
+                  "type": "N"
+                },
+                {
+                  "name": "last.le",
+                  "type": "N"
+                }
+              ],
+              "labels": {},
+              "readToken": "",
+              "reducer": null,
+              "reducerLabels": [],
+              "reducers": [
+                "argmax",
+                "argmin",
+                "count",
+                "count.exclude-nulls",
+                "count.include-nulls",
+                "join",
+                "join.forbid-nulls",
+                "max",
+                "max.forbid-nulls",
+                "mean",
+                "mean.exclude-nulls",
+                "mean.circular",
+                "mean.circular.exclude-nulls",
+                "median",
+                "min",
+                "min.forbid-nulls",
+                "and",
+                "and.exclude-nulls",
+                "or",
+                "or.exclude-nulls",
+                "sd",
+                "shannonentropy.0",
+                "shannonentropy.1",
+                "sum",
+                "sum.forbid-nulls",
+                "var"
+              ]
+            },
+            "refId": "A"
+          }
+        ],
+        "textSize": 24,
+        "textSizeTime": 5,
+        "timeOptions": [
+          {
+            "name": "Years",
+            "value": "years"
+          },
+          {
+            "name": "Months",
+            "value": "months"
+          },
+          {
+            "name": "Weeks",
+            "value": "weeks"
+          },
+          {
+            "name": "Days",
+            "value": "days"
+          },
+          {
+            "name": "Hours",
+            "value": "hours"
+          },
+          {
+            "name": "Minutes",
+            "value": "minutes"
+          },
+          {
+            "name": "Seconds",
+            "value": "seconds"
+          },
+          {
+            "name": "Milliseconds",
+            "value": "milliseconds"
+          }
+        ],
+        "timePrecision": {
+          "name": "Minutes",
+          "value": "minutes"
+        },
+        "timeTextColor": "#d8d9da",
+        "title": "Completion",
+        "transparent": true,
+        "type": "natel-discrete-panel",
+        "units": "short",
+        "useTimePrecision": false,
+        "valueMaps": [
+          {
+            "op": "=",
+            "text": "N/A",
+            "value": "null"
+          }
+        ],
+        "valueTextColor": "#000000",
+        "writeAllValues": false,
+        "writeLastValue": false,
+        "writeMetricNames": false
+      },
+      {
+        "cacheTimeout": null,
+        "colorBackground": false,
+        "colorPostfix": false,
+        "colorPrefix": false,
+        "colorValue": true,
+        "colors": [
+          "#ea6460",
+          "#eab839",
+          "#9ac48a"
+        ],
+        "datasource": "Jerem",
+        "format": "percent",
+        "gauge": {
+          "maxValue": 100,
+          "minValue": 0,
+          "show": false,
+          "thresholdLabels": false,
+          "thresholdMarkers": false
+        },
+        "gridPos": {
+          "h": 10,
+          "w": 2,
+          "x": 0,
+          "y": 22
+        },
+        "id": 71,
+        "interval": null,
+        "links": [],
+        "mappingType": 1,
+        "mappingTypes": [
+          {
+            "name": "value to text",
+            "value": 1
+          },
+          {
+            "name": "range to text",
+            "value": 2
+          }
+        ],
+        "maxDataPoints": 100,
+        "nullPointMode": "connected",
+        "nullText": null,
+        "options": {},
+        "postfix": "",
+        "postfixFontSize": "50%",
+        "prefix": "",
+        "prefixFontSize": "50%",
+        "rangeMaps": [
+          {
+            "from": "null",
+            "text": "N/A",
+            "to": "null"
+          }
+        ],
+        "sparkline": {
+          "fillColor": "rgba(31, 118, 189, 0.18)",
+          "full": false,
+          "lineColor": "rgb(31, 120, 193)",
+          "show": false
+        },
+        "tableColumn": "",
+        "targets": [
+          {
+            "advancedMode": true,
+            "expr": "$RTOKEN AUTHENTICATE\n4000000 LIMIT\n\n0 'shift' STORE\n<% \n   $sprint 'current' !=\n%>\n<%\n  [ $RTOKEN '~jerem.jira.sprint.storypoint.done' { 'project' $project 'sprint' $sprint } $end -1 ] FETCH \n  <% DUP SIZE 0 > %>\n  <% \n     0 GET TICKS 0 GET\n     DUP $end - ABS 'shift' STORE\n     'end' STORE\n     \n  %>\n  IFT\n%>\nIFT\n\n[ $RTOKEN '~jerem.jira.sprint.storypoint.*' { 'project' $project 'sprint' $sprint } $end 1 h ] FETCH\n[ SWAP bucketizer.last $end 0 1 ] BUCKETIZE\n{} SWAP\n<%\n  DUP NAME '.' SPLIT DUP SIZE 1 - GET SWAP DUP LASTTICK ATTICK 4 GET 2 ->MAP APPEND\n%> FOREACH\n'stats' STORE\n\n$stats 'done' GET TODOUBLE 'done' STORE\n$stats 'total' GET TODOUBLE 'total' STORE\n\nNEWGTS 'done' RENAME \n$start $interval 2 / + NaN NaN NaN $done TODOUBLE $total TODOUBLE 100.0 / / ADDVALUE\n\n$shift TIMESHIFT",
+            "friendlyQuery": {
+              "bucketCount": 50,
+              "bucketizer": null,
+              "bucketizers": [
+                "sum",
+                "max",
+                "min",
+                "mean",
+                "mean.circular",
+                "bucketizer.mean.circular.exclude-nulls",
+                "first",
+                "last",
+                "join",
+                "median",
+                "count",
+                "and",
+                "or"
+              ],
+              "className": "",
+              "filter": null,
+              "filterLabels": [],
+              "filterParamClass": "",
+              "filterParamMap": {},
+              "filterParamNumber": 0,
+              "filters": [
+                {
+                  "name": "byclass",
+                  "type": "S"
+                },
+                {
+                  "name": "bylabels",
+                  "type": "M"
+                },
+                {
+                  "name": "last.eq",
+                  "type": "N"
+                },
+                {
+                  "name": "last.ne",
+                  "type": "N"
+                },
+                {
+                  "name": "last.gt",
+                  "type": "N"
+                },
+                {
+                  "name": "last.ge",
+                  "type": "N"
+                },
+                {
+                  "name": "last.lt",
+                  "type": "N"
+                },
+                {
+                  "name": "last.le",
+                  "type": "N"
+                }
+              ],
+              "labels": {},
+              "readToken": "",
+              "reducer": null,
+              "reducerLabels": [],
+              "reducers": [
+                "argmax",
+                "argmin",
+                "count",
+                "count.exclude-nulls",
+                "count.include-nulls",
+                "join",
+                "join.forbid-nulls",
+                "max",
+                "max.forbid-nulls",
+                "mean",
+                "mean.exclude-nulls",
+                "mean.circular",
+                "mean.circular.exclude-nulls",
+                "median",
+                "min",
+                "min.forbid-nulls",
+                "and",
+                "and.exclude-nulls",
+                "or",
+                "or.exclude-nulls",
+                "sd",
+                "shannonentropy.0",
+                "shannonentropy.1",
+                "sum",
+                "sum.forbid-nulls",
+                "var"
+              ]
+            },
+            "hideAttributes": true,
+            "hideLabels": true,
+            "refId": "A"
+          }
+        ],
+        "thresholds": "",
+        "title": "Sprint Completion",
+        "type": "singlestat",
+        "valueFontSize": "80%",
+        "valueMaps": [
+          {
+            "op": "=",
+            "text": "N/A",
+            "value": "null"
+          }
+        ],
+        "valueName": "avg"
+      },
+      {
+        "aliasColors": {},
+        "bars": false,
+        "dashLength": 10,
+        "dashes": false,
+        "datasource": "Jerem",
+        "fill": 0,
+        "fillGradient": 0,
+        "gridPos": {
+          "h": 10,
+          "w": 7,
+          "x": 2,
+          "y": 22
+        },
+        "hiddenSeries": false,
+        "id": 65,
+        "legend": {
+          "avg": false,
+          "current": false,
+          "max": false,
+          "min": false,
+          "show": true,
+          "total": false,
+          "values": false
+        },
+        "lines": true,
+        "linewidth": 1,
+        "links": [],
+        "nullPointMode": "null",
+        "options": {
+          "dataLinks": []
+        },
+        "percentage": false,
+        "pointradius": 5,
+        "points": false,
+        "renderer": "flot",
+        "seriesOverrides": [
+          {
+            "alias": "remaining.storypoints",
+            "color": "#629e51"
+          },
+          {
+            "alias": "likelihood",
+            "color": "#00a1f1"
+          }
+        ],
+        "spaceLength": 10,
+        "stack": false,
+        "steppedLine": false,
+        "targets": [
+          {
+            "advancedMode": true,
+            "expr": "$end ->TSELEMENTS 0 GET TOSTRING 'year' STORE\nNEWGTS 'notWorkingDay' RENAME 'notWorkingDay' STORE\n$nowork EVAL <% $year '-' + SWAP + 'T12:00:00.000000Z' + TOTIMESTAMP $notWorkingDay SWAP NaN NaN NaN 1 ADDVALUE 'notWorkingDay' STORE %> FOREACH\n\n[ $RTOKEN '~jerem.jira.sprint.events' { 'project' $project 'sprint' $sprint } MAXLONG -1 ] FETCH DUP\n<% DUP SIZE 0 > %>\n<% \n   0 GET TICKS 0 GET\n   $end - -1 * 'shift' STORE\n   'end' STORE\n%>\n<%\n    DROP\n%>\nIFTE\n\n[ $RTOKEN '~jerem.jira.sprint.events' { 'project' $project 'sprint' $sprint } MAXLONG -2 ] FETCH DUP\n[ SWAP 'end' mapper.eq 0 0 0 ] MAP 0 GET LASTTICK 'end' STORE\n[ SWAP 'start' mapper.eq 0 0 0 ] MAP 0 GET LASTTICK 'start' STORE\n\n[ $RTOKEN '~jerem.jira.sprint.storypoint.(total|done)' { 'project' $project 'sprint' $sprint } $start ISO8601 $end ISO8601  ] FETCH\n[ SWAP bucketizer.last $end $interval 120 / 120 ] BUCKETIZE FILLNEXT SORT\n\n$shift TIMESHIFT\n'data' STORE\n\n[ $data [] 'jerem.jira.sprint.storypoint.total' filter.byclass ] FILTER SORT\n'total.sprint.storypoints' RENAME\n0 GET 'total' STORE\n[ $data [] 'jerem.jira.sprint.storypoint.done' filter.byclass ] FILTER\n'done' RENAME\n0 GET 'done' STORE\n\n[ $done ]\n[ SWAP -1.0 mapper.mul 0 0 0 ] MAP\n$total +\n[ SWAP [] reducer.sum ] REDUCE\n'remaining.storypoints' RENAME SORT\n\n$start 'date' STORE\n0 50 \n<% \n    DROP\n    <% $date $end > %>\n    <% BREAK %>\n    IFT\n    \n    $date ->TSELEMENTS\n    <% 8 GET 5 > %>\n    <% $notWorkingDay $date NaN NaN NaN 1 ADDVALUE 'notWorkingDay' STORE  %>\n    IFT\n    \n    $date 1 d + 'date' STORE\n%>\nFOR\n\nNEWGTS\n'likelihood' RENAME\n\n$start NaN NaN NaN $total DUP FIRSTTICK ATTICK 4 GET DUP 'totalValue' STORE\nADDVALUE\n'likelihood' STORE\n\n$start 'prevDate' STORE\n$totalValue 'prevValue' STORE\n$notWorkingDay \n[ [ $start $end ] ] CLIP SORT DUP 0 GET SIZE 'totalDay' STORE\n0 GET TICKLIST\n<% \n    DUP 1 d - ->TSELEMENTS \n    18 3 SET\n    0 4 SET\n    0 5 SET\n    0 6 SET\n    TSELEMENTS-> 'tmp-start' STORE\n    1 d + ->TSELEMENTS \n    9 3 SET\n    0 4 SET\n    0 5 SET\n    0 6 SET\n    TSELEMENTS-> 'tmp-end' STORE\n    \n    <% $tmp-start $prevDate > %>\n    <% \n        $totalValue TODOUBLE $tmp-start $prevDate - * $end $start - $totalDay 24 h * - TODOUBLE /\n        $prevValue SWAP -\n        'prevValue' STORE\n    %> \n    IFT\n    $tmp-end 'prevDate' STORE\n    $likelihood\n    $tmp-start NaN NaN NaN $prevValue ADDVALUE \n    $tmp-end NaN NaN NaN $prevValue ADDVALUE\n    'likelihood' STORE\n%>\nFOREACH\nSORT\n$likelihood\n$end NaN NaN NaN 0 ADDVALUE\n\n$shift TIMESHIFT SORT",
+            "friendlyQuery": {
+              "bucketCount": 50,
+              "bucketizer": null,
+              "bucketizers": [
+                "sum",
+                "max",
+                "min",
+                "mean",
+                "mean.circular",
+                "bucketizer.mean.circular.exclude-nulls",
+                "first",
+                "last",
+                "join",
+                "median",
+                "count",
+                "and",
+                "or"
+              ],
+              "className": "",
+              "filter": null,
+              "filterLabels": [],
+              "filterParamClass": "",
+              "filterParamMap": {},
+              "filterParamNumber": 0,
+              "filters": [
+                {
+                  "name": "byclass",
+                  "type": "S"
+                },
+                {
+                  "name": "bylabels",
+                  "type": "M"
+                },
+                {
+                  "name": "last.eq",
+                  "type": "N"
+                },
+                {
+                  "name": "last.ne",
+                  "type": "N"
+                },
+                {
+                  "name": "last.gt",
+                  "type": "N"
+                },
+                {
+                  "name": "last.ge",
+                  "type": "N"
+                },
+                {
+                  "name": "last.lt",
+                  "type": "N"
+                },
+                {
+                  "name": "last.le",
+                  "type": "N"
+                }
+              ],
+              "labels": {},
+              "nameFormat": "",
+              "readToken": "",
+              "reducer": null,
+              "reducerLabels": [],
+              "reducers": [
+                "argmax",
+                "argmin",
+                "count",
+                "count.exclude-nulls",
+                "count.include-nulls",
+                "join",
+                "join.forbid-nulls",
+                "max",
+                "max.forbid-nulls",
+                "mean",
+                "mean.exclude-nulls",
+                "mean.circular",
+                "mean.circular.exclude-nulls",
+                "median",
+                "min",
+                "min.forbid-nulls",
+                "and",
+                "and.exclude-nulls",
+                "or",
+                "or.exclude-nulls",
+                "sd",
+                "shannonentropy.0",
+                "shannonentropy.1",
+                "sum",
+                "sum.forbid-nulls",
+                "var"
+              ]
+            },
+            "hideLabels": true,
+            "refId": "A"
+          }
+        ],
+        "thresholds": [],
+        "timeFrom": "15 d",
+        "timeRegions": [],
+        "timeShift": null,
+        "title": "Burndown",
+        "tooltip": {
+          "shared": true,
+          "sort": 0,
+          "value_type": "individual"
+        },
+        "type": "graph",
+        "xaxis": {
+          "buckets": null,
+          "mode": "time",
+          "name": null,
+          "show": true,
+          "values": []
+        },
+        "yaxes": [
+          {
+            "format": "short",
+            "label": null,
+            "logBase": 1,
+            "max": null,
+            "min": null,
+            "show": true
+          },
+          {
+            "format": "short",
+            "label": null,
+            "logBase": 1,
+            "max": null,
+            "min": null,
+            "show": true
+          }
+        ],
+        "yaxis": {
+          "align": false,
+          "alignLevel": null
+        }
+      },
+      {
+        "cacheTimeout": null,
+        "colorBackground": false,
+        "colorValue": false,
+        "colors": [
+          "#299c46",
+          "rgba(237, 129, 40, 0.89)",
+          "#d44a3a"
+        ],
+        "datasource": "Jerem",
+        "format": "none",
+        "gauge": {
+          "maxValue": 100,
+          "minValue": 0,
+          "show": false,
+          "thresholdLabels": false,
+          "thresholdMarkers": true
+        },
+        "gridPos": {
+          "h": 5,
+          "w": 3,
+          "x": 9,
+          "y": 22
+        },
+        "id": 75,
+        "interval": null,
+        "links": [],
+        "mappingType": 1,
+        "mappingTypes": [
+          {
+            "name": "value to text",
+            "value": 1
+          },
+          {
+            "name": "range to text",
+            "value": 2
+          }
+        ],
+        "maxDataPoints": 100,
+        "nullPointMode": "connected",
+        "nullText": null,
+        "options": {},
+        "postfix": "",
+        "postfixFontSize": "50%",
+        "prefix": "",
+        "prefixFontSize": "50%",
+        "rangeMaps": [
+          {
+            "from": "null",
+            "text": "N/A",
+            "to": "null"
+          }
+        ],
+        "sparkline": {
+          "fillColor": "rgba(31, 118, 189, 0.18)",
+          "full": false,
+          "lineColor": "rgb(31, 120, 193)",
+          "show": false
+        },
+        "tableColumn": "",
+        "targets": [
+          {
+            "advancedMode": true,
+            "expr": "$RTOKEN AUTHENTICATE\n4000000 LIMIT\n\n0 'shift' STORE\n<% \n   $sprint 'current' !=\n%>\n<%\n  [ $RTOKEN '~jerem.jira.sprint.storypoint.done' { 'project' $project 'sprint' $sprint } $end -1 ] FETCH \n  <% DUP SIZE 0 > %>\n  <% \n     0 GET TICKS 0 GET\n     DUP $end - ABS 'shift' STORE\n     'end' STORE\n     \n  %>\n  IFT\n%>\nIFT\n\n[ $RTOKEN 'jerem.jira.impediment.total.count' { 'project' $project 'type' 'sprint' 'sprint' $sprint  } $end  1 h ] FETCH\n[ SWAP bucketizer.last 0 0 1 ] BUCKETIZE",
+            "friendlyQuery": {
+              "bucketCount": 50,
+              "bucketizer": null,
+              "bucketizers": [
+                "sum",
+                "max",
+                "min",
+                "mean",
+                "mean.circular",
+                "bucketizer.mean.circular.exclude-nulls",
+                "first",
+                "last",
+                "join",
+                "median",
+                "count",
+                "and",
+                "or"
+              ],
+              "className": "",
+              "filter": null,
+              "filterLabels": [],
+              "filterParamClass": "",
+              "filterParamMap": {},
+              "filterParamNumber": 0,
+              "filters": [
+                {
+                  "name": "byclass",
+                  "type": "S"
+                },
+                {
+                  "name": "bylabels",
+                  "type": "M"
+                },
+                {
+                  "name": "last.eq",
+                  "type": "N"
+                },
+                {
+                  "name": "last.ne",
+                  "type": "N"
+                },
+                {
+                  "name": "last.gt",
+                  "type": "N"
+                },
+                {
+                  "name": "last.ge",
+                  "type": "N"
+                },
+                {
+                  "name": "last.lt",
+                  "type": "N"
+                },
+                {
+                  "name": "last.le",
+                  "type": "N"
+                }
+              ],
+              "labels": {},
+              "readToken": "",
+              "reducer": null,
+              "reducerLabels": [],
+              "reducers": [
+                "argmax",
+                "argmin",
+                "count",
+                "count.exclude-nulls",
+                "count.include-nulls",
+                "join",
+                "join.forbid-nulls",
+                "max",
+                "max.forbid-nulls",
+                "mean",
+                "mean.exclude-nulls",
+                "mean.circular",
+                "mean.circular.exclude-nulls",
+                "median",
+                "min",
+                "min.forbid-nulls",
+                "and",
+                "and.exclude-nulls",
+                "or",
+                "or.exclude-nulls",
+                "sd",
+                "shannonentropy.0",
+                "shannonentropy.1",
+                "sum",
+                "sum.forbid-nulls",
+                "var"
+              ]
+            },
+            "hideAttributes": true,
+            "hideLabels": true,
+            "refId": "A"
+          }
+        ],
+        "thresholds": "",
+        "title": "Total number of impediments in current sprint",
+        "type": "singlestat",
+        "valueFontSize": "80%",
+        "valueMaps": [
+          {
+            "op": "=",
+            "text": "N/A",
+            "value": "null"
+          }
+        ],
+        "valueName": "avg"
+      },
+      {
+        "aliasColors": {},
+        "bars": false,
+        "dashLength": 10,
+        "dashes": false,
+        "datasource": "Jerem",
+        "description": "Update time spent (on impediment creation date) once the impediment task is closed",
+        "fill": 1,
+        "fillGradient": 0,
+        "gridPos": {
+          "h": 10,
+          "w": 7,
+          "x": 12,
+          "y": 22
+        },
+        "hiddenSeries": false,
+        "id": 81,
+        "legend": {
+          "alignAsTable": false,
+          "avg": false,
+          "current": false,
+          "max": false,
+          "min": false,
+          "rightSide": false,
+          "show": true,
+          "total": false,
+          "values": false
+        },
+        "lines": true,
+        "linewidth": 1,
+        "links": [],
+        "nullPointMode": "null as zero",
+        "options": {
+          "dataLinks": []
+        },
+        "percentage": false,
+        "pointradius": 5,
+        "points": false,
+        "renderer": "flot",
+        "seriesOverrides": [],
+        "spaceLength": 10,
+        "stack": false,
+        "steppedLine": false,
+        "targets": [
+          {
+            "advancedMode": true,
+            "expr": "[ $RTOKEN 'jerem.jira.impediment.total.created' { 'project' $project 'type' 'daily' } $end $interval ] FETCH\n$end 1 d + 1 d / 1 d * 'endDate' STORE\n[ SWAP bucketizer.sum $endDate 1 d 0 ] BUCKETIZE [ NaN NaN NaN 0 ] FILLVALUE SORT\n'impediment.timespent' RENAME\nSORT",
+            "friendlyQuery": {
+              "bucketCount": 50,
+              "bucketizer": null,
+              "bucketizers": [
+                "sum",
+                "max",
+                "min",
+                "mean",
+                "mean.circular",
+                "bucketizer.mean.circular.exclude-nulls",
+                "first",
+                "last",
+                "join",
+                "median",
+                "count",
+                "and",
+                "or"
+              ],
+              "className": "",
+              "filter": null,
+              "filterLabels": [],
+              "filterParamClass": "",
+              "filterParamMap": {},
+              "filterParamNumber": 0,
+              "filters": [
+                {
+                  "name": "byclass",
+                  "type": "S"
+                },
+                {
+                  "name": "bylabels",
+                  "type": "M"
+                },
+                {
+                  "name": "last.eq",
+                  "type": "N"
+                },
+                {
+                  "name": "last.ne",
+                  "type": "N"
+                },
+                {
+                  "name": "last.gt",
+                  "type": "N"
+                },
+                {
+                  "name": "last.ge",
+                  "type": "N"
+                },
+                {
+                  "name": "last.lt",
+                  "type": "N"
+                },
+                {
+                  "name": "last.le",
+                  "type": "N"
+                }
+              ],
+              "labels": {},
+              "readToken": "",
+              "reducer": null,
+              "reducerLabels": [],
+              "reducers": [
+                "argmax",
+                "argmin",
+                "count",
+                "count.exclude-nulls",
+                "count.include-nulls",
+                "join",
+                "join.forbid-nulls",
+                "max",
+                "max.forbid-nulls",
+                "mean",
+                "mean.exclude-nulls",
+                "mean.circular",
+                "mean.circular.exclude-nulls",
+                "median",
+                "min",
+                "min.forbid-nulls",
+                "and",
+                "and.exclude-nulls",
+                "or",
+                "or.exclude-nulls",
+                "sd",
+                "shannonentropy.0",
+                "shannonentropy.1",
+                "sum",
+                "sum.forbid-nulls",
+                "var"
+              ]
+            },
+            "hideAttributes": true,
+            "hideLabels": true,
+            "refId": "A"
+          }
+        ],
+        "thresholds": [],
+        "timeFrom": "15 d",
+        "timeRegions": [],
+        "timeShift": null,
+        "title": "Daily impediment",
+        "tooltip": {
+          "shared": true,
+          "sort": 0,
+          "value_type": "individual"
+        },
+        "type": "graph",
+        "xaxis": {
+          "buckets": null,
+          "mode": "time",
+          "name": null,
+          "show": true,
+          "values": []
+        },
+        "yaxes": [
+          {
+            "format": "dthms",
+            "label": null,
+            "logBase": 1,
+            "max": null,
+            "min": null,
+            "show": true
+          },
+          {
+            "format": "short",
+            "label": null,
+            "logBase": 1,
+            "max": null,
+            "min": null,
+            "show": true
+          }
+        ],
+        "yaxis": {
+          "align": false,
+          "alignLevel": null
+        }
+      },
+      {
+        "aliasColors": {},
+        "breakPoint": "100%",
+        "cacheTimeout": null,
+        "combine": {
+          "label": "Others",
+          "threshold": 0
+        },
+        "datasource": "Jerem",
+        "description": "Nature of impediment count per sprint\nIt corresponds to a field declared by a user when creating an impediment",
+        "fontSize": "80%",
+        "format": "short",
+        "gridPos": {
+          "h": 5,
+          "w": 5,
+          "x": 19,
+          "y": 22
+        },
+        "hideTimeOverride": false,
+        "id": 78,
+        "interval": null,
+        "legend": {
+          "percentage": true,
+          "show": true,
+          "sort": null,
+          "sortDesc": null,
+          "values": true
+        },
+        "legendType": "Right side",
+        "links": [],
+        "maxDataPoints": 3,
+        "nullPointMode": "connected",
+        "options": {},
+        "pieType": "pie",
+        "strokeWidth": 1,
+        "targets": [
+          {
+            "advancedMode": true,
+            "expr": "$RTOKEN AUTHENTICATE\n4000000 LIMIT\n\n0 'shift' STORE\n<% \n   $sprint 'current' !=\n%>\n<%\n  [ $RTOKEN '~jerem.jira.sprint.storypoint.done' { 'project' $project 'sprint' $sprint } $end -1 ] FETCH \n  <% DUP SIZE 0 > %>\n  <% \n     0 GET TICKS 0 GET\n     DUP $end - ABS 'shift' STORE\n     'end' STORE\n     \n  %>\n  IFT\n%>\nIFT\n\n[ $RTOKEN '~jerem.jira.impediment.*.count' { 'project' $project 'sprint' $sprint } $end 1 h ] FETCH\n\n[]\nSWAP\n<%\n    DUP\n    NAME '.' SPLIT 3 GET\n    <% DUP 'total' != %>\n    <% RENAME + %>\n    <% DROP DROP %>\n    IFTE\n%>\nFOREACH\n\n<% NAME %> SORTBY \n\n[ SWAP bucketizer.last $end 0 1 ] BUCKETIZE\n\nDUP [ SWAP [] reducer.sum ] REDUCE 'total' STORE\n\n[ $RTOKEN '~jerem.jira.impediment.total.count' { 'project' $project 'sprint' $sprint } $end 1 h ] FETCH\n[ SWAP bucketizer.last $end 0 1 ] BUCKETIZE\n\n[ \n  SWAP\n  $total\n  []\n  op.sub\n]\nAPPLY\n'undefined' RENAME \n[ SWAP 0.0 mapper.ge 0 0 0 ] MAP\n[ NaN NaN NaN 0 ] FILLVALUE\nAPPEND\n<% NAME %> SORTBY ",
+            "friendlyQuery": {
+              "bucketCount": 50,
+              "bucketizer": null,
+              "bucketizers": [
+                "sum",
+                "max",
+                "min",
+                "mean",
+                "mean.circular",
+                "bucketizer.mean.circular.exclude-nulls",
+                "first",
+                "last",
+                "join",
+                "median",
+                "count",
+                "and",
+                "or"
+              ],
+              "className": "",
+              "filter": null,
+              "filterLabels": [],
+              "filterParamClass": "",
+              "filterParamMap": {},
+              "filterParamNumber": 0,
+              "filters": [
+                {
+                  "name": "byclass",
+                  "type": "S"
+                },
+                {
+                  "name": "bylabels",
+                  "type": "M"
+                },
+                {
+                  "name": "last.eq",
+                  "type": "N"
+                },
+                {
+                  "name": "last.ne",
+                  "type": "N"
+                },
+                {
+                  "name": "last.gt",
+                  "type": "N"
+                },
+                {
+                  "name": "last.ge",
+                  "type": "N"
+                },
+                {
+                  "name": "last.lt",
+                  "type": "N"
+                },
+                {
+                  "name": "last.le",
+                  "type": "N"
+                }
+              ],
+              "labels": {},
+              "readToken": "",
+              "reducer": null,
+              "reducerLabels": [],
+              "reducers": [
+                "argmax",
+                "argmin",
+                "count",
+                "count.exclude-nulls",
+                "count.include-nulls",
+                "join",
+                "join.forbid-nulls",
+                "max",
+                "max.forbid-nulls",
+                "mean",
+                "mean.exclude-nulls",
+                "mean.circular",
+                "mean.circular.exclude-nulls",
+                "median",
+                "min",
+                "min.forbid-nulls",
+                "and",
+                "and.exclude-nulls",
+                "or",
+                "or.exclude-nulls",
+                "sd",
+                "shannonentropy.0",
+                "shannonentropy.1",
+                "sum",
+                "sum.forbid-nulls",
+                "var"
+              ]
+            },
+            "hideAttributes": true,
+            "hideLabels": true,
+            "refId": "A"
+          }
+        ],
+        "title": "Number of impediment per nature",
+        "type": "grafana-piechart-panel",
+        "valueName": "current"
+      },
+      {
+        "cacheTimeout": null,
+        "colorBackground": false,
+        "colorPostfix": false,
+        "colorPrefix": false,
+        "colorValue": true,
+        "colors": [
+          "#9ac48a",
+          "#eab839",
+          "#d44a3a"
+        ],
+        "datasource": "Jerem",
+        "description": "Format is Hours:Minutes:Seconds",
+        "format": "dthms",
+        "gauge": {
+          "maxValue": 100,
+          "minValue": 0,
+          "show": false,
+          "thresholdLabels": false,
+          "thresholdMarkers": true
+        },
+        "gridPos": {
+          "h": 5,
+          "w": 3,
+          "x": 9,
+          "y": 27
+        },
+        "hideTimeOverride": false,
+        "id": 76,
+        "interval": null,
+        "links": [],
+        "mappingType": 1,
+        "mappingTypes": [
+          {
+            "name": "value to text",
+            "value": 1
+          },
+          {
+            "name": "range to text",
+            "value": 2
+          }
+        ],
+        "maxDataPoints": 100,
+        "nullPointMode": "connected",
+        "nullText": null,
+        "options": {},
+        "postfix": "",
+        "postfixFontSize": "50%",
+        "prefix": "",
+        "prefixFontSize": "50%",
+        "rangeMaps": [
+          {
+            "from": "null",
+            "text": "N/A",
+            "to": "null"
+          }
+        ],
+        "sparkline": {
+          "fillColor": "rgba(31, 118, 189, 0.18)",
+          "full": false,
+          "lineColor": "rgb(31, 120, 193)",
+          "show": false
+        },
+        "tableColumn": "",
+        "targets": [
+          {
+            "advancedMode": true,
+            "expr": "$RTOKEN AUTHENTICATE\n4000000 LIMIT\n\n0 'shift' STORE\n<% \n   $sprint 'current' !=\n%>\n<%\n  [ $RTOKEN '~jerem.jira.sprint.storypoint.done' { 'project' $project 'sprint' $sprint } $end -1 ] FETCH \n  <% DUP SIZE 0 > %>\n  <% \n     0 GET TICKS 0 GET\n     DUP $end - ABS 'shift' STORE\n     'end' STORE\n     \n  %>\n  IFT\n%>\nIFT\n\n[ $RTOKEN 'jerem.jira.impediment.total.timespent' { 'project' $project 'type' 'sprint' 'sprint' $sprint } $end  1 h ] FETCH\n[ SWAP bucketizer.last 0 0 1 ] BUCKETIZE\n\n$sprint 'key' STORE\n<% $sprint 'current' == %>\n<% $project TOLOWER '-current' + 'key' STORE %>\nIFT \n\n<%\n  'substract' DEFINED\n%>\n<%\n<% $substract EVAL $key CONTAINSKEY %> \n<% \n  $key GET 'value' STORE \n  [ SWAP $value TODOUBLE -1.0 * h 1 s / mapper.add 0 0 0 ] MAP\n%>\n<% DROP %>\nIFTE \n%>\nIFT",
+            "friendlyQuery": {
+              "bucketCount": 50,
+              "bucketizer": null,
+              "bucketizers": [
+                "sum",
+                "max",
+                "min",
+                "mean",
+                "mean.circular",
+                "bucketizer.mean.circular.exclude-nulls",
+                "first",
+                "last",
+                "join",
+                "median",
+                "count",
+                "and",
+                "or"
+              ],
+              "className": "",
+              "filter": null,
+              "filterLabels": [],
+              "filterParamClass": "",
+              "filterParamMap": {},
+              "filterParamNumber": 0,
+              "filters": [
+                {
+                  "name": "byclass",
+                  "type": "S"
+                },
+                {
+                  "name": "bylabels",
+                  "type": "M"
+                },
+                {
+                  "name": "last.eq",
+                  "type": "N"
+                },
+                {
+                  "name": "last.ne",
+                  "type": "N"
+                },
+                {
+                  "name": "last.gt",
+                  "type": "N"
+                },
+                {
+                  "name": "last.ge",
+                  "type": "N"
+                },
+                {
+                  "name": "last.lt",
+                  "type": "N"
+                },
+                {
+                  "name": "last.le",
+                  "type": "N"
+                }
+              ],
+              "labels": {},
+              "readToken": "",
+              "reducer": null,
+              "reducerLabels": [],
+              "reducers": [
+                "argmax",
+                "argmin",
+                "count",
+                "count.exclude-nulls",
+                "count.include-nulls",
+                "join",
+                "join.forbid-nulls",
+                "max",
+                "max.forbid-nulls",
+                "mean",
+                "mean.exclude-nulls",
+                "mean.circular",
+                "mean.circular.exclude-nulls",
+                "median",
+                "min",
+                "min.forbid-nulls",
+                "and",
+                "and.exclude-nulls",
+                "or",
+                "or.exclude-nulls",
+                "sd",
+                "shannonentropy.0",
+                "shannonentropy.1",
+                "sum",
+                "sum.forbid-nulls",
+                "var"
+              ]
+            },
+            "hideAttributes": true,
+            "hideLabels": true,
+            "refId": "A"
+          }
+        ],
+        "thresholds": "",
+        "title": "Total time spend in impediments in current sprint",
+        "type": "singlestat",
+        "valueFontSize": "80%",
+        "valueMaps": [
+          {
+            "op": "=",
+            "text": "N/A",
+            "value": "null"
+          }
+        ],
+        "valueName": "avg"
+      },
+      {
+        "aliasColors": {},
+        "breakPoint": "100%",
+        "cacheTimeout": null,
+        "combine": {
+          "label": "Others",
+          "threshold": 0
+        },
+        "datasource": "Jerem",
+        "description": "Duration format is Hours:Minutes:Seconds",
+        "fontSize": "80%",
+        "format": "dthms",
+        "gridPos": {
+          "h": 5,
+          "w": 5,
+          "x": 19,
+          "y": 27
+        },
+        "id": 79,
+        "interval": null,
+        "legend": {
+          "percentage": true,
+          "percentageDecimals": 0,
+          "show": true,
+          "sort": null,
+          "sortDesc": null,
+          "values": true
+        },
+        "legendType": "Right side",
+        "links": [],
+        "maxDataPoints": 3,
+        "nullPointMode": "connected",
+        "options": {},
+        "pieType": "pie",
+        "strokeWidth": 1,
+        "targets": [
+          {
+            "advancedMode": true,
+            "expr": "$RTOKEN AUTHENTICATE\n4000000 LIMIT\n\n0 'shift' STORE\n<% \n   $sprint 'current' !=\n%>\n<%\n  [ $RTOKEN '~jerem.jira.sprint.storypoint.done' { 'project' $project 'sprint' $sprint } $end -1 ] FETCH \n  <% DUP SIZE 0 > %>\n  <% \n     0 GET TICKS 0 GET\n     DUP $end - ABS 'shift' STORE\n     'end' STORE\n     \n  %>\n  IFT\n%>\nIFT\n\n[ $RTOKEN '~jerem.jira.impediment.*.timespent' { 'project' $project 'sprint' $sprint  } $end  1 h ] FETCH\n\n[]\nSWAP\n<%\n    DUP\n    NAME '.' SPLIT 3 GET\n    <% DUP 'total' != %>\n    <% RENAME + %>\n    <% DROP DROP %>\n    IFTE\n%>\nFOREACH\n\n<% NAME %> SORTBY \n\n[ SWAP bucketizer.last $end 0 1 ] BUCKETIZE\n\n\nDUP [ SWAP [] reducer.sum ] REDUCE 'total' STORE\n\n[ $RTOKEN '~jerem.jira.impediment.total.timespent' { 'project' $project 'sprint' $sprint } $end  1 h ] FETCH\n[ SWAP bucketizer.last $end 0 1 ] BUCKETIZE\n\n[ \n  SWAP\n  $total\n  []\n  op.sub\n]\nAPPLY\n'undefined' RENAME\n\n[ SWAP 0.0 mapper.ge 0 0 0 ] MAP\n[ NaN NaN NaN 0 ] FILLVALUE\n\nAPPEND\n<% NAME %> SORTBY ",
+            "friendlyQuery": {
+              "bucketCount": 50,
+              "bucketizer": null,
+              "bucketizers": [
+                "sum",
+                "max",
+                "min",
+                "mean",
+                "mean.circular",
+                "bucketizer.mean.circular.exclude-nulls",
+                "first",
+                "last",
+                "join",
+                "median",
+                "count",
+                "and",
+                "or"
+              ],
+              "className": "",
+              "filter": null,
+              "filterLabels": [],
+              "filterParamClass": "",
+              "filterParamMap": {},
+              "filterParamNumber": 0,
+              "filters": [
+                {
+                  "name": "byclass",
+                  "type": "S"
+                },
+                {
+                  "name": "bylabels",
+                  "type": "M"
+                },
+                {
+                  "name": "last.eq",
+                  "type": "N"
+                },
+                {
+                  "name": "last.ne",
+                  "type": "N"
+                },
+                {
+                  "name": "last.gt",
+                  "type": "N"
+                },
+                {
+                  "name": "last.ge",
+                  "type": "N"
+                },
+                {
+                  "name": "last.lt",
+                  "type": "N"
+                },
+                {
+                  "name": "last.le",
+                  "type": "N"
+                }
+              ],
+              "labels": {},
+              "readToken": "",
+              "reducer": null,
+              "reducerLabels": [],
+              "reducers": [
+                "argmax",
+                "argmin",
+                "count",
+                "count.exclude-nulls",
+                "count.include-nulls",
+                "join",
+                "join.forbid-nulls",
+                "max",
+                "max.forbid-nulls",
+                "mean",
+                "mean.exclude-nulls",
+                "mean.circular",
+                "mean.circular.exclude-nulls",
+                "median",
+                "min",
+                "min.forbid-nulls",
+                "and",
+                "and.exclude-nulls",
+                "or",
+                "or.exclude-nulls",
+                "sd",
+                "shannonentropy.0",
+                "shannonentropy.1",
+                "sum",
+                "sum.forbid-nulls",
+                "var"
+              ]
+            },
+            "hideAttributes": true,
+            "hideLabels": true,
+            "refId": "A"
+          }
+        ],
+        "title": "Time spend in impediment per nature",
+        "type": "grafana-piechart-panel",
+        "valueName": "current"
+      },
+      {
+        "collapsed": false,
+        "datasource": null,
+        "gridPos": {
+          "h": 1,
+          "w": 24,
+          "x": 0,
+          "y": 32
+        },
+        "id": 83,
+        "panels": [],
+        "title": "Detail KPI",
+        "type": "row"
+      },
+      {
+        "aliasColors": {},
+        "bars": false,
+        "dashLength": 10,
+        "dashes": false,
+        "datasource": "Jerem",
+        "fill": 1,
+        "fillGradient": 0,
+        "gridPos": {
+          "h": 6,
+          "w": 12,
+          "x": 0,
+          "y": 33
+        },
+        "hiddenSeries": false,
+        "id": 104,
+        "legend": {
+          "alignAsTable": true,
+          "avg": false,
+          "current": true,
+          "max": false,
+          "min": false,
+          "rightSide": true,
+          "show": true,
+          "total": false,
+          "values": true
+        },
+        "lines": true,
+        "linewidth": 1,
+        "links": [],
+        "nullPointMode": "null",
+        "options": {
+          "dataLinks": []
+        },
+        "percentage": false,
+        "pointradius": 5,
+        "points": false,
+        "renderer": "flot",
+        "seriesOverrides": [
+          {
+            "alias": "PLANED",
+            "points": true
+          },
+          {
+            "alias": "DONE",
+            "points": true
+          }
+        ],
+        "spaceLength": 10,
+        "stack": false,
+        "steppedLine": false,
+        "targets": [
+          {
+            "advancedMode": true,
+            "expr": "$RTOKEN AUTHENTICATE\n4000000 LIMIT\n\n$end ->TSELEMENTS \n<%\n    'i' STORE\n    <% $i 3 == $i 4 == || $i 5 == || $i 6 == || %>\n    <% DROP 0 %>\n    IFT\n    <% $i 8 == %>\n    <% DUP 'date' STORE %>\n    IFT\n%>\nLMAP\nTSELEMENTS-> 1 s - 8 $date - d +\n'endBucketize' STORE\n'grafanaMultiVariable' FIMPORT\n$epic @grafanaMultiVariable 'epic' STORE\n<% $epic 'All' ==  %>\n  <% '~.*' 'epic' STORE  %>\nIFT\n\n[ $RTOKEN '~jerem.jira.epic.*' { 'project' $project 'quarter' $activeQuarter 'key' $epic } $end $interval  ] FETCH \n\n\n[]\nSWAP\n\n<% \n  DUP\n  NAME 'name' STORE\n  {\n    'class' \n     $name\n  }\n  RELABEL +\n%>\nFOREACH\n[ SWAP [ 'class' 'key' ] reducer.max ] REDUCE  \n[ SWAP bucketizer.last $endBucketize 1 w $interval 1 w / 2 + ] BUCKETIZE [ NaN NaN NaN 0 ] FILLVALUE\n[ SWAP [ 'class' ] reducer.sum ] REDUCE  \n\n'data' STORE \n\n\n[ $data [] 'jerem.jira.epic.storypoint.done' filter.byclass ] FILTER  \n[ SWAP   mapper.todouble 0 0 0 ] MAP\n<%\n    DUP SIZE 0 == \n%>\n<%\n    DROP\n    NEWGTS\n    [ SWAP bucketizer.last $endBucketize 1 w $interval 1 w / 2 + ] BUCKETIZE [ NaN NaN NaN 0 ] FILLVALUE\n%>\nIFT\n0 GET \n'DONE' RENAME\n     \n[ $data [] 'jerem.jira.epic.storypoint' filter.byclass ] FILTER \n<%\n    DUP SIZE 0 == \n%>\n<%\n    DROP\n    NEWGTS\n    [ SWAP bucketizer.last $endBucketize 1 w $interval 1 w / 2 + ] BUCKETIZE [ NaN NaN NaN 0 ] FILLVALUE\n%>\nIFT\n[ SWAP   mapper.todouble 0 0 0 ] MAP\n0 GET\n'PLANED' RENAME",
+            "friendlyQuery": {
+              "bucketCount": 50,
+              "bucketizer": null,
+              "bucketizers": [
+                "sum",
+                "max",
+                "min",
+                "mean",
+                "mean.circular",
+                "bucketizer.mean.circular.exclude-nulls",
+                "first",
+                "last",
+                "join",
+                "median",
+                "count",
+                "and",
+                "or"
+              ],
+              "className": "",
+              "filter": null,
+              "filterLabels": [],
+              "filterParamClass": "",
+              "filterParamMap": {},
+              "filterParamNumber": 0,
+              "filters": [
+                {
+                  "name": "byclass",
+                  "type": "S"
+                },
+                {
+                  "name": "bylabels",
+                  "type": "M"
+                },
+                {
+                  "name": "last.eq",
+                  "type": "N"
+                },
+                {
+                  "name": "last.ne",
+                  "type": "N"
+                },
+                {
+                  "name": "last.gt",
+                  "type": "N"
+                },
+                {
+                  "name": "last.ge",
+                  "type": "N"
+                },
+                {
+                  "name": "last.lt",
+                  "type": "N"
+                },
+                {
+                  "name": "last.le",
+                  "type": "N"
+                }
+              ],
+              "labels": {},
+              "nameFormat": "",
+              "readToken": "",
+              "reducer": null,
+              "reducerLabels": [],
+              "reducers": [
+                "argmax",
+                "argmin",
+                "count",
+                "count.exclude-nulls",
+                "count.include-nulls",
+                "join",
+                "join.forbid-nulls",
+                "max",
+                "max.forbid-nulls",
+                "mean",
+                "mean.exclude-nulls",
+                "mean.circular",
+                "mean.circular.exclude-nulls",
+                "median",
+                "min",
+                "min.forbid-nulls",
+                "and",
+                "and.exclude-nulls",
+                "or",
+                "or.exclude-nulls",
+                "sd",
+                "shannonentropy.0",
+                "shannonentropy.1",
+                "sum",
+                "sum.forbid-nulls",
+                "var"
+              ]
+            },
+            "hideAttributes": true,
+            "hideLabels": true,
+            "refId": "A"
+          }
+        ],
+        "thresholds": [],
+        "timeFrom": null,
+        "timeRegions": [],
+        "timeShift": null,
+        "title": "Epic burnup",
+        "tooltip": {
+          "shared": true,
+          "sort": 0,
+          "value_type": "individual"
+        },
+        "type": "graph",
+        "xaxis": {
+          "buckets": null,
+          "mode": "time",
+          "name": null,
+          "show": true,
+          "values": []
+        },
+        "yaxes": [
+          {
+            "format": "short",
+            "label": null,
+            "logBase": 1,
+            "max": null,
+            "min": null,
+            "show": true
+          },
+          {
+            "format": "dateTimeAsUS",
+            "label": null,
+            "logBase": 1,
+            "max": null,
+            "min": null,
+            "show": false
+          }
+        ],
+        "yaxis": {
+          "align": false,
+          "alignLevel": 0
+        }
+      },
+      {
+        "columns": [],
+        "datasource": "Jerem",
+        "fontSize": "110%",
+        "gridPos": {
+          "h": 6,
+          "w": 12,
+          "x": 12,
+          "y": 33
+        },
+        "id": 105,
+        "links": [],
+        "options": {},
+        "pageSize": null,
+        "scroll": true,
+        "showHeader": true,
+        "sort": {
+          "col": null,
+          "desc": false
+        },
+        "styles": [
+          {
+            "alias": "",
+            "colorMode": null,
+            "dateFormat": "YYYY-MM-DD HH:mm:ss",
+            "pattern": "Done",
+            "type": "number",
+            "unit": "none"
+          },
+          {
+            "alias": "",
+            "colorMode": "cell",
+            "colors": [
+              "rgba(245, 54, 54, 0.9)",
+              "rgba(237, 129, 40, 0.89)",
+              "rgba(50, 172, 45, 0.97)"
+            ],
+            "dateFormat": "YYYY-MM-DD HH:mm:ss",
+            "decimals": 0,
+            "link": false,
+            "mappingType": 1,
+            "pattern": "%",
+            "thresholds": [
+              "1",
+              "100"
+            ],
+            "type": "number",
+            "unit": "percent"
+          },
+          {
+            "alias": "",
+            "colorMode": null,
+            "colors": [
+              "rgba(245, 54, 54, 0.9)",
+              "rgba(237, 129, 40, 0.89)",
+              "rgba(50, 172, 45, 0.97)"
+            ],
+            "dateFormat": "YYYY-MM-DD HH:mm:ss",
+            "decimals": 2,
+            "link": true,
+            "linkTargetBlank": true,
+            "linkTooltip": "Show ${__cell}",
+            "linkUrl": "https://projects.dsi.ovh/browse/${__cell}",
+            "mappingType": 1,
+            "pattern": "Epic",
+            "thresholds": [],
+            "type": "string",
+            "unit": "short"
+          },
+          {
+            "alias": "",
+            "colorMode": null,
+            "colors": [
+              "rgba(245, 54, 54, 0.9)",
+              "rgba(237, 129, 40, 0.89)",
+              "rgba(50, 172, 45, 0.97)"
+            ],
+            "dateFormat": "YYYY-MM-DD HH:mm:ss",
+            "decimals": 2,
+            "mappingType": 1,
+            "pattern": "Summary",
+            "preserveFormat": false,
+            "sanitize": false,
+            "thresholds": [],
+            "type": "string",
+            "unit": "short"
+          },
+          {
+            "alias": "",
+            "colorMode": null,
+            "colors": [
+              "rgba(245, 54, 54, 0.9)",
+              "rgba(237, 129, 40, 0.00)",
+              "rgba(50, 172, 45, 0)"
+            ],
+            "dateFormat": "YYYY-MM-DD HH:mm:ss",
+            "decimals": 0,
+            "mappingType": 1,
+            "pattern": "StoryPoint",
+            "thresholds": [
+              "1",
+              "100000"
+            ],
+            "type": "number",
+            "unit": "none"
+          },
+          {
+            "alias": "",
+            "colorMode": null,
+            "colors": [
+              "rgba(245, 54, 54, 0.9)",
+              "rgba(237, 129, 40, 0.89)",
+              "rgba(50, 172, 45, 0.97)"
+            ],
+            "dateFormat": "YYYY-MM-DD HH:mm:ss",
+            "decimals": 2,
+            "mappingType": 1,
+            "pattern": "",
+            "thresholds": [],
+            "type": "number",
+            "unit": "short"
+          },
+          {
+            "alias": "",
+            "colorMode": null,
+            "colors": [
+              "rgba(50, 172, 45, 0.97)",
+              "rgba(237, 129, 40, 0.89)",
+              "rgba(245, 54, 54, 0.9)"
+            ],
+            "decimals": 0,
+            "pattern": "Doing",
+            "thresholds": [
+              ""
+            ],
+            "type": "number",
+            "unit": "none"
+          },
+          {
+            "alias": "",
+            "colorMode": null,
+            "colors": [
+              "rgba(245, 54, 54, 0.9)",
+              "rgba(237, 129, 40, 0.89)",
+              "rgba(50, 172, 45, 0.97)"
+            ],
+            "dateFormat": "YYYY-MM-DD HH:mm:ss",
+            "decimals": 0,
+            "mappingType": 1,
+            "pattern": "ToDo",
+            "thresholds": [],
+            "type": "number",
+            "unit": "none"
+          }
+        ],
+        "targets": [
+          {
+            "advancedMode": true,
+            "expr": "$RTOKEN AUTHENTICATE\n4000000 LIMIT\n\n'grafanaMultiVariable' FIMPORT\n$epic @grafanaMultiVariable 'epic' STORE\n<% $epic 'All' ==  %>\n  <% '~.*' 'epic' STORE  %>\nIFT\n\n[ $RTOKEN '~jerem.jira.epic.storypoint.*' { 'project' $project 'quarter' $activeQuarter 'key' $epic  } $end 1 h - $interval  ] FETCH DUP 'set' STORE\n\n<% \n  DROP\n  DUP\n  NAME 'name' STORE\n  {\n    'class' \n     $name\n  }\n  RELABEL\n%>\nLMAP\n[ SWAP [] bucketizer.last $end 0 1 ] BUCKETIZE \n[ SWAP [ 'class' 'key' ] reducer.max ] REDUCE\n'data' STORE\n[ \n    [ $data [] 'jerem.jira.epic.storypoint' filter.byclass ] FILTER\n    [ $data [] 'jerem.jira.epic.storypoint.done' filter.byclass ] FILTER \n [ 'key' ]\n  op.eq\n]\nAPPLY\n[ SWAP true mapper.eq 0 0 0 ] MAP\nNONEMPTY\n<% \n   DROP\n   LABELS 'key' GET\n%>\nLMAP \n'keys' STORE\n[ $set [] { 'key' '~' $keys '|' JOIN + }  filter.bylabels ] FILTER\n\n[ $RTOKEN '~jerem.jira.*' { 'quarter' $activeQuarter 'project' $project 'key' $epic } $end $interval ] FETCH\nAPPEND\n\n// Group by key\n<% DROP\n  DUP NAME 'class' SWAP 2 ->MAP RELABEL\n%> LMAP\n[ SWAP [ 'class' 'key' ] reducer.max ] REDUCE\n[ SWAP bucketizer.last $end 0 1 ] BUCKETIZE\n'series' STORE\n\n// Extract keys\n$series\n<% DROP\n    LABELS 'key' GET\n%> LMAP\nUNIQUE 'keys' STORE\n\n$keys\n<% DROP\n  'key' STORE\n  [ $series [] { 'key' $key } filter.bylabels ] FILTER\n  \n  {} SWAP\n  <%\n    DUP LABELS 'key' GET 'key' SWAP 2 ->MAP SWAP\n    DUP LABELS 'summary' GET 'summary' SWAP 2 ->MAP SWAP\n    DUP NAME '.' SPLIT DUP SIZE 1 - GET SWAP DUP LASTTICK ATTICK 4 GET 2 ->MAP APPEND APPEND APPEND\n  %> FOREACH\n%> LMAP\n\n\n\n<% DROP\n  'v' STORE\n  [ \n    $v 'key' GET\n    $v 'summary' GET <% DUP ISNULL %> <% DROP '' %> <% URLDECODE %> IFTE\n    $v 'storypoint' GET TODOUBLE DUP 'Total' STORE\n    $v 'done' GET TODOUBLE DUP 'Done' STORE\n    $v 'inprogress' GET TODOUBLE DUP 'Doing' STORE\n    $Total $Doing - $Done - // Print Todo column\n    $v 'unestimated' GET <% DUP ISNULL %> <% DROP 0 %> <% TODOUBLE ROUND %> IFTE   \n    $v 'dependency' GET <% DUP ISNULL %> <% DROP 0 %> <% TODOUBLE ROUND %> IFTE   \n    <% $Total 0 == %>\n      <% 0 %>\n      <% $Done $Total  / 100 * %>\n    IFTE\n  ]\n%> LMAP\n\n<%\n  8 GET TODOUBLE\n%> SORTBY REVERSE\n\n// Count total\n$series\n[ SWAP [ 'class' ] reducer.sum ] REDUCE\n{} SWAP\n<%\n  DUP LABELS 'key' GET 'key' SWAP 2 ->MAP SWAP\n  DUP LABELS 'summary' GET 'summary' SWAP 2 ->MAP SWAP\n  DUP NAME '.' SPLIT DUP SIZE 1 - GET SWAP DUP LASTTICK ATTICK 4 GET 2 ->MAP APPEND APPEND APPEND\n%> FOREACH\n'total' STORE\n\n[ '' '' ] +\n\n\n$total 'storypoint' GET TODOUBLE 'StoryPoint' STORE\n$total 'inprogress' GET TODOUBLE 'Doing' STORE\n$total 'done' GET TODOUBLE 'Done' STORE\n$total 'unestimated' GET TODOUBLE 'Unestimated' STORE\n$total 'dependency' GET TODOUBLE 'Dependency' STORE\n\n$StoryPoint $Doing - $Done - 'ToDo' STORE\n$Done $StoryPoint / 100 * 'Ratio' STORE\n\n\n[ '' 'Total' $StoryPoint $Done $Doing $ToDo $Unestimated $Dependency $Ratio ] + 'rows' STORE\n\n{\n  'columns' [\n    {\n      'text' 'Epic'\n      'type' 'string'\n    }\n    {\n      'text' 'Summary'\n      'type' 'string'\n    }\n    {\n      'text' 'StoryPoint'\n      'type' 'number'\n    }\n    {\n      'text' 'Done'\n      'type' 'number'\n    }\n    {\n      'text' 'Doing'\n      'type' 'number'\n    }\n    {\n      'text' 'ToDo'\n      'type' 'number'\n    }\n    {\n      'text' 'Unestimated'\n      'type' 'number'\n    }\n    {\n      'text' 'Dependency'\n      'type' 'number'\n    }\n    {\n      'text' '%25'\n      'type' 'number'\n    }\n  ]\n  'rows'\n    $rows\n}\n\n",
+            "friendlyQuery": {
+              "bucketCount": 50,
+              "bucketizer": null,
+              "bucketizers": [
+                "sum",
+                "max",
+                "min",
+                "mean",
+                "mean.circular",
+                "bucketizer.mean.circular.exclude-nulls",
+                "first",
+                "last",
+                "join",
+                "median",
+                "count",
+                "and",
+                "or"
+              ],
+              "className": "",
+              "filter": null,
+              "filterLabels": [],
+              "filterParamClass": "",
+              "filterParamMap": {},
+              "filterParamNumber": 0,
+              "filters": [
+                {
+                  "name": "byclass",
+                  "type": "S"
+                },
+                {
+                  "name": "bylabels",
+                  "type": "M"
+                },
+                {
+                  "name": "last.eq",
+                  "type": "N"
+                },
+                {
+                  "name": "last.ne",
+                  "type": "N"
+                },
+                {
+                  "name": "last.gt",
+                  "type": "N"
+                },
+                {
+                  "name": "last.ge",
+                  "type": "N"
+                },
+                {
+                  "name": "last.lt",
+                  "type": "N"
+                },
+                {
+                  "name": "last.le",
+                  "type": "N"
+                }
+              ],
+              "labels": {},
+              "nameFormat": "",
+              "readToken": "",
+              "reducer": null,
+              "reducerLabels": [],
+              "reducers": [
+                "argmax",
+                "argmin",
+                "count",
+                "count.exclude-nulls",
+                "count.include-nulls",
+                "join",
+                "join.forbid-nulls",
+                "max",
+                "max.forbid-nulls",
+                "mean",
+                "mean.exclude-nulls",
+                "mean.circular",
+                "mean.circular.exclude-nulls",
+                "median",
+                "min",
+                "min.forbid-nulls",
+                "and",
+                "and.exclude-nulls",
+                "or",
+                "or.exclude-nulls",
+                "sd",
+                "shannonentropy.0",
+                "shannonentropy.1",
+                "sum",
+                "sum.forbid-nulls",
+                "var"
+              ]
+            },
+            "refId": "A"
+          }
+        ],
+        "title": "Roadmap (specific epics)",
+        "transform": "table",
+        "type": "table"
+      },
+      {
+        "columns": [],
+        "datasource": "Jerem",
+        "fontSize": "100%",
+        "gridPos": {
+          "h": 6,
+          "w": 12,
+          "x": 0,
+          "y": 39
+        },
+        "id": 111,
+        "links": [],
+        "options": {},
+        "pageSize": null,
+        "scroll": true,
+        "showHeader": true,
+        "sort": {
+          "col": 0,
+          "desc": true
+        },
+        "styles": [
+          {
+            "alias": "Time",
+            "dateFormat": "YYYY-MM-DD HH:mm:ss",
+            "pattern": "Time",
+            "type": "date"
+          },
+          {
+            "alias": "",
+            "colorMode": "cell",
+            "colors": [
+              "#f29191",
+              "#f2c96d",
+              "#7eb26d"
+            ],
+            "dateFormat": "YYYY-MM-DD HH:mm:ss",
+            "decimals": 0,
+            "mappingType": 1,
+            "pattern": "completion",
+            "thresholds": [
+              "50",
+              "75"
+            ],
+            "type": "number",
+            "unit": "percent"
+          },
+          {
+            "alias": "",
+            "colorMode": null,
+            "colors": [
+              "rgba(245, 54, 54, 0.9)",
+              "rgba(237, 129, 40, 0.89)",
+              "rgba(50, 172, 45, 0.97)"
+            ],
+            "dateFormat": "YYYY-MM-DD HH:mm:ss",
+            "decimals": 2,
+            "mappingType": 1,
+            "pattern": "",
+            "thresholds": [],
+            "type": "number",
+            "unit": "short"
+          },
+          {
+            "alias": "",
+            "colorMode": null,
+            "colors": [
+              "rgba(245, 54, 54, 0.9)",
+              "rgba(237, 129, 40, 0.89)",
+              "rgba(50, 172, 45, 0.97)"
+            ],
+            "decimals": 0,
+            "pattern": "/.*/",
+            "thresholds": [],
+            "type": "number",
+            "unit": "short"
+          }
+        ],
+        "targets": [
+          {
+            "advancedMode": true,
+            "expr": "'templateGrafana' FIMPORT\n\n[ $RTOKEN 'jerem.jira.sprint.storypoint.done' { 'project' $project 'sprint' '~(?!current).*' } $end $interval ] FETCH\n//[ SWAP bucketizer.last 0 0 1 ] BUCKETIZE\n[ 'sprint' ] METASORT\n\nDUP\n\n<% DROP \n  LABELS 'sprint' GET '\\+' '' REPLACEALL 1 ->LIST\n%> LMAP\n\nSWAP \n<% DROP\n  [ SWAP bucketizer.last 0 0 1 ] BUCKETIZE 0 GET\n  VALUES 0 GET\n%> LMAP\n\n\n[ $RTOKEN 'jerem.jira.sprint.storypoint.total' { 'project' $project 'sprint' '~(?!current).*' } $end $interval ] FETCH\n[ 'sprint' ] METASORT\n<% DROP\n  [ SWAP bucketizer.last 0 0 1 ] BUCKETIZE 0 GET\n  VALUES 0 GET \n%> LMAP\n\n3 ->LIST ZIP 'data' STORE\n\n$data\n<% DROP \n  'd' STORE\n  $d 1 GET TODOUBLE $d 2 GET TODOUBLE / 100 *\n  $d SWAP +\n%> LMAP\n'data' STORE\n\n{\n  'columns' [\n    { 'text' 'Sprint' 'type' 'text' 'sort' true 'desc' false }\n    { 'text' 'done' 'type' 'number' }\n    { 'text' 'total' }\n    { 'text' 'completion' 'type' 'number' }\n  ]\n  'rows' $data\n}",
+            "friendlyQuery": {
+              "bucketCount": 50,
+              "bucketizer": null,
+              "bucketizers": [
+                "sum",
+                "max",
+                "min",
+                "mean",
+                "mean.circular",
+                "bucketizer.mean.circular.exclude-nulls",
+                "first",
+                "last",
+                "join",
+                "median",
+                "count",
+                "and",
+                "or"
+              ],
+              "className": "",
+              "filter": null,
+              "filterLabels": [],
+              "filterParamClass": "",
+              "filterParamMap": {},
+              "filterParamNumber": 0,
+              "filters": [
+                {
+                  "name": "byclass",
+                  "type": "S"
+                },
+                {
+                  "name": "bylabels",
+                  "type": "M"
+                },
+                {
+                  "name": "last.eq",
+                  "type": "N"
+                },
+                {
+                  "name": "last.ne",
+                  "type": "N"
+                },
+                {
+                  "name": "last.gt",
+                  "type": "N"
+                },
+                {
+                  "name": "last.ge",
+                  "type": "N"
+                },
+                {
+                  "name": "last.lt",
+                  "type": "N"
+                },
+                {
+                  "name": "last.le",
+                  "type": "N"
+                }
+              ],
+              "labels": {},
+              "nameFormat": "",
+              "readToken": "",
+              "reducer": null,
+              "reducerLabels": [],
+              "reducers": [
+                "argmax",
+                "argmin",
+                "count",
+                "count.exclude-nulls",
+                "count.include-nulls",
+                "join",
+                "join.forbid-nulls",
+                "max",
+                "max.forbid-nulls",
+                "mean",
+                "mean.exclude-nulls",
+                "mean.circular",
+                "mean.circular.exclude-nulls",
+                "median",
+                "min",
+                "min.forbid-nulls",
+                "and",
+                "and.exclude-nulls",
+                "or",
+                "or.exclude-nulls",
+                "sd",
+                "shannonentropy.0",
+                "shannonentropy.1",
+                "sum",
+                "sum.forbid-nulls",
+                "var"
+              ]
+            },
+            "refId": "A"
+          }
+        ],
+        "title": "Sprint Completion",
+        "transform": "table",
+        "type": "table"
+      },
+      {
+        "aliasColors": {},
+        "bars": false,
+        "dashLength": 10,
+        "dashes": false,
+        "datasource": "Jerem",
+        "fill": 2,
+        "fillGradient": 0,
+        "gridPos": {
+          "h": 6,
+          "w": 12,
+          "x": 12,
+          "y": 39
+        },
+        "hiddenSeries": false,
+        "id": 113,
+        "legend": {
+          "alignAsTable": false,
+          "avg": false,
+          "current": false,
+          "hideEmpty": false,
+          "hideZero": false,
+          "max": false,
+          "min": false,
+          "rightSide": false,
+          "show": true,
+          "total": false,
+          "values": false
+        },
+        "lines": true,
+        "linewidth": 2,
+        "links": [],
+        "nullPointMode": "null",
+        "options": {
+          "dataLinks": []
+        },
+        "percentage": false,
+        "pointradius": 6,
+        "points": false,
+        "renderer": "flot",
+        "seriesOverrides": [
+          {
+            "alias": "/done-*/",
+            "color": "#bf1b00",
+            "fill": 8
+          },
+          {
+            "alias": "/planed-*/",
+            "color": "#6d1f62",
+            "fill": 8
+          }
+        ],
+        "spaceLength": 10,
+        "stack": false,
+        "steppedLine": false,
+        "targets": [
+          {
+            "advancedMode": true,
+            "expr": "$RTOKEN AUTHENTICATE\n4000000 LIMIT\n\n\n[ $RTOKEN '~jerem.jira.sprint.storypoint.total' { 'project' $project 'sprint' '~(?!current).*' } $start ISO8601 $end ISO8601  ] FETCH\n<%\n  DROP\n  DUP FIRSTTICK 'tick' STORE\n  { 'firsttick' $tick TOSTRING } RELABEL\n%>\nLMAP\n[ SWAP bucketizer.last 0 0 1 ] BUCKETIZE\n<% \n  DROP  DUP \n  LABELS \n  'sprint' GET 'planed-' SWAP + RENAME\n  DUP DUP LASTTICK ATTICK 4 GET 'value' STORE\n  DUP LABELS 'firsttick' GET TOLONG 'firsttick' STORE \n  DUP LASTTICK $firsttick - 2 / -1 * TIMESHIFT\n  $firsttick NaN NaN NaN $value ADDVALUE\n%>\nLMAP \n\n[ $RTOKEN '~jerem.jira.sprint.storypoint.done' { 'project' $project 'sprint' '~(?!current).*' } $start ISO8601 $end ISO8601  ] FETCH\n<%\n  DROP\n  DUP FIRSTTICK 'tick' STORE\n  { 'firsttick' $tick TOSTRING } RELABEL\n%>\nLMAP\n[ SWAP bucketizer.last 0 0 1 ] BUCKETIZE\n<% \n  DROP  DUP \n  LABELS \n  'sprint' GET 'done-' SWAP + RENAME\n  DUP DUP LASTTICK ATTICK 4 GET 'value' STORE\n  DUP LABELS 'firsttick' GET TOLONG 'firsttick' STORE \n  DUP LASTTICK $firsttick - 2 / $firsttick +\n  NaN NaN NaN $value ADDVALUE\n%>\nLMAP \n",
+            "friendlyQuery": {
+              "bucketCount": 50,
+              "bucketizer": null,
+              "bucketizers": [
+                "sum",
+                "max",
+                "min",
+                "mean",
+                "mean.circular",
+                "bucketizer.mean.circular.exclude-nulls",
+                "first",
+                "last",
+                "join",
+                "median",
+                "count",
+                "and",
+                "or"
+              ],
+              "className": "",
+              "filter": null,
+              "filterLabels": [],
+              "filterParamClass": "",
+              "filterParamMap": {},
+              "filterParamNumber": 0,
+              "filters": [
+                {
+                  "name": "byclass",
+                  "type": "S"
+                },
+                {
+                  "name": "bylabels",
+                  "type": "M"
+                },
+                {
+                  "name": "last.eq",
+                  "type": "N"
+                },
+                {
+                  "name": "last.ne",
+                  "type": "N"
+                },
+                {
+                  "name": "last.gt",
+                  "type": "N"
+                },
+                {
+                  "name": "last.ge",
+                  "type": "N"
+                },
+                {
+                  "name": "last.lt",
+                  "type": "N"
+                },
+                {
+                  "name": "last.le",
+                  "type": "N"
+                }
+              ],
+              "labels": {},
+              "readToken": "",
+              "reducer": null,
+              "reducerLabels": [],
+              "reducers": [
+                "argmax",
+                "argmin",
+                "count",
+                "count.exclude-nulls",
+                "count.include-nulls",
+                "join",
+                "join.forbid-nulls",
+                "max",
+                "max.forbid-nulls",
+                "mean",
+                "mean.exclude-nulls",
+                "mean.circular",
+                "mean.circular.exclude-nulls",
+                "median",
+                "min",
+                "min.forbid-nulls",
+                "and",
+                "and.exclude-nulls",
+                "or",
+                "or.exclude-nulls",
+                "sd",
+                "shannonentropy.0",
+                "shannonentropy.1",
+                "sum",
+                "sum.forbid-nulls",
+                "var"
+              ]
+            },
+            "hideAttributes": true,
+            "hideLabels": true,
+            "refId": "A"
+          }
+        ],
+        "thresholds": [],
+        "timeFrom": "120d",
+        "timeRegions": [],
+        "timeShift": null,
+        "title": "Velocity chart",
+        "tooltip": {
+          "shared": false,
+          "sort": 0,
+          "value_type": "individual"
+        },
+        "type": "graph",
+        "xaxis": {
+          "buckets": null,
+          "mode": "time",
+          "name": null,
+          "show": true,
+          "values": []
+        },
+        "yaxes": [
+          {
+            "format": "short",
+            "label": null,
+            "logBase": 1,
+            "max": null,
+            "min": null,
+            "show": true
+          },
+          {
+            "format": "dateTimeAsUS",
+            "label": null,
+            "logBase": 1,
+            "max": null,
+            "min": null,
+            "show": false
+          }
+        ],
+        "yaxis": {
+          "align": false,
+          "alignLevel": 0
+        }
+      }
+    ],
+    "refresh": "1m",
+    "schemaVersion": 21,
+    "style": "dark",
+    "tags": [],
+    "templating": {
+      "list": [
+        {
+          "allValue": null,
+          "current": {
+            "text": "NAME",
+            "value": "NAME"
+          },
+          "datasource": "Jerem",
+          "definition": "[ 'NAME' ]",
+          "hide": 0,
+          "includeAll": false,
+          "label": "Project",
+          "multi": false,
+          "name": "project",
+          "options": [],
+          "query": "[ 'NAME' ]",
+          "refresh": 1,
+          "regex": "",
+          "skipUrlSync": false,
+          "sort": 0,
+          "tagValuesQuery": "",
+          "tags": [],
+          "tagsQuery": "",
+          "type": "query",
+          "useTags": false
+        },
+        {
+          "allValue": null,
+          "current": {
+            "isNone": true,
+            "selected": false,
+            "text": "None",
+            "value": ""
+          },
+          "datasource": "Jerem",
+          "definition": "",
+          "hide": 0,
+          "includeAll": false,
+          "label": "Sprint",
+          "multi": false,
+          "name": "sprint",
+          "options": [],
+          "query": "[ $RTOKEN 'jerem.jira.sprint.storypoint.done' { 'project' $project } ] FIND <% DROP LABELS 'sprint' GET %> LMAP UNIQUE",
+          "refresh": 1,
+          "regex": "",
+          "skipUrlSync": false,
+          "sort": 1,
+          "tagValuesQuery": "",
+          "tags": [],
+          "tagsQuery": "",
+          "type": "query",
+          "useTags": false
+        },
+        {
+          "allValue": null,
+          "current": {
+            "text": "13",
+            "value": "13"
+          },
+          "datasource": "Jerem",
+          "definition": "",
+          "hide": 0,
+          "includeAll": false,
+          "label": "Weeks",
+          "multi": false,
+          "name": "weeks",
+          "options": [],
+          "query": "[ 1 53 <% %> FOR ]",
+          "refresh": 1,
+          "regex": "",
+          "skipUrlSync": false,
+          "sort": 0,
+          "tagValuesQuery": "",
+          "tags": [],
+          "tagsQuery": "",
+          "type": "query",
+          "useTags": false
+        },
+        {
+          "allValue": null,
+          "current": {
+            "selected": true,
+            "tags": [],
+            "text": "2020-02-28",
+            "value": "2020-02-28"
+          },
+          "hide": 0,
+          "includeAll": false,
+          "label": "Quarter end date",
+          "multi": false,
+          "name": "quarter",
+          "options": [
+            {
+              "selected": true,
+              "text": "2020-02-28",
+              "value": "2020-02-28"
+            }
+          ],
+          "query": "2020-02-28",
+          "skipUrlSync": false,
+          "type": "custom"
+        },
+        {
+          "allValue": null,
+          "current": {
+            "isNone": false,
+            "selected": false,
+            "text": "Q2-20",
+            "value": "Q2-20"
+          },
+          "datasource": "Jerem",
+          "definition": "",
+          "hide": 0,
+          "includeAll": false,
+          "label": "Active quarter",
+          "multi": false,
+          "name": "activeQuarter",
+          "options": [],
+          "query": "[ $RTOKEN '~jerem.jira.epic.*' { 'project' $project } ] FIND <% DROP LABELS 'quarter' GET %> LMAP UNIQUE",
+          "refresh": 1,
+          "regex": "",
+          "skipUrlSync": false,
+          "sort": 1,
+          "tagValuesQuery": "",
+          "tags": [],
+          "tagsQuery": "",
+          "type": "query",
+          "useTags": false
+        },
+        {
+          "current": {
+            "text": "[ '05-08' '07-14' '08-15' '01-11' '11-11' '12-25' '01-01' ]",
+            "value": "[ '05-08' '07-14' '08-15' '01-11' '11-11' '12-25' '01-01' ]"
+          },
+          "hide": 2,
+          "label": "Not Working Days",
+          "name": "nowork",
+          "options": [
+            {
+              "selected": true,
+              "text": "[ '05-08' '07-14' '08-15' '01-11' '11-11' '12-25' '01-01' ]",
+              "value": "[ '05-08' '07-14' '08-15' '01-11' '11-11' '12-25' '01-01' ]"
+            }
+          ],
+          "query": "[ '05-08' '07-14' '08-15' '01-11' '11-11' '12-25' '01-01' ]",
+          "skipUrlSync": false,
+          "type": "constant"
+        },
+        {
+          "allValue": "~.*",
+          "current": {
+            "selected": false,
+            "text": "All",
+            "value": "$__all"
+          },
+          "datasource": "Jerem",
+          "definition": "[ $RTOKEN '~jerem.jira.*' { 'quarter' $activeQuarter 'project' $project } ] FIND <% DROP LABELS 'key' GET %> LMAP UNIQUE LSORT",
+          "hide": 0,
+          "includeAll": true,
+          "label": "Epic(s)",
+          "multi": true,
+          "name": "epic",
+          "options": [],
+          "query": "[ $RTOKEN '~jerem.jira.*' { 'quarter' $activeQuarter 'project' $project } ] FIND <% DROP LABELS 'key' GET %> LMAP UNIQUE LSORT",
+          "refresh": 1,
+          "regex": "",
+          "skipUrlSync": false,
+          "sort": 1,
+          "tagValuesQuery": "",
+          "tags": [],
+          "tagsQuery": "",
+          "type": "query",
+          "useTags": false
+        },
+        {
+          "current": {
+            "selected": true,
+            "text": "{}",
+            "value": "{}"
+          },
+          "hide": 2,
+          "label": "Substract",
+          "name": "oldsubstract",
+          "options": [
+            {
+              "selected": true,
+              "text": "{}",
+              "value": "{}"
+            }
+          ],
+          "query": "{}",
+          "skipUrlSync": false,
+          "type": "constant"
+        },
+        {
+          "allValue": null,
+          "current": {
+            "text": "30",
+            "value": "30"
+          },
+          "datasource": "Warp10 - metrics",
+          "definition": "{} <% DUP $project CONTAINSKEY %> <%  $project GET %> <% DROP 30 %> IFTE",
+          "hide": 2,
+          "includeAll": false,
+          "label": "Secutity coeficient",
+          "multi": false,
+          "name": "security_coef",
+          "options": [],
+          "query": "{} <% DUP $project CONTAINSKEY %> <%  $project GET %> <% DROP 30 %> IFTE",
+          "refresh": 1,
+          "regex": "",
+          "skipUrlSync": false,
+          "sort": 0,
+          "tagValuesQuery": "",
+          "tags": [],
+          "tagsQuery": "",
+          "type": "query",
+          "useTags": false
+        }
+      ]
+    },
+    "time": {
+      "from": "now-90d",
+      "to": "now"
+    },
+    "timepicker": {
+      "refresh_intervals": [
+        "5s",
+        "10s",
+        "30s",
+        "1m",
+        "5m",
+        "15m",
+        "30m",
+        "1h",
+        "2h",
+        "1d"
+      ],
+      "time_options": [
+        "5m",
+        "15m",
+        "1h",
+        "6h",
+        "12h",
+        "24h",
+        "2d",
+        "7d",
+        "30d"
+      ]
+    },
+    "timezone": "utc",
+    "title": "CUSTOM_TITLE",
+    "id": null,
+    "uid": null
+  }

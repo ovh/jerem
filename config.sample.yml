@@ -1,0 +1,16 @@
+jira:
+  username: jira.bot
+  password: 123456789
+  url: https://jira.com
+
+metrics:
+  url: https://warp.gra1-ovh.metrics.ovh.net
+  token: abcdef
+
+projects:
+  - name: K8S
+    board: 0
+  - name: OB
+    board: 1
+
+runner.period: 300
