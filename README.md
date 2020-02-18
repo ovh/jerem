@@ -65,11 +65,11 @@ make compile
 
 Instructions on how to contribute to Jerem are available on the [Contributing](./CONTRIBUTING.md) page.
 
-## License
+## License
 
 Jerem is released under a [3-BSD clause license](./LICENSE).
 
-## Grafana's dashboards
+## Grafana's dashboards
 
 In the grafana folder we are going to integrate all dashboards computed from Jerem metrics:
 
