@@ -70,9 +70,11 @@ func SprintRunner(config core.Config) {
 	batch.Print(&b)
 	log.Debug(b.String())
 
-	err = batch.Push(config.Metrics.URL, config.Metrics.Token)
-	if err != nil {
-		log.WithError(err).Error("Fail to push metrics")
+	if len(*batch) != 0 {
+		err = batch.Push(config.Metrics.URL, config.Metrics.Token)
+		if err != nil {
+			log.WithError(err).Error("Fail to push metrics")
+		}
 	}
 }
 
