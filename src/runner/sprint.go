@@ -36,13 +36,13 @@ func SprintRunner(config core.Config) {
 		}
 
 		for _, sprint := range sprints.Values {
-			processSprint(jiraClient, sprint, project.Name, batch)
+			processSprint(jiraClient, sprint, project.Name, batch, config.Jira.ClosedStatus)
 		}
 
 		// Get last day closed impediment and set issue timespent at its creation date
 		var closedImpediments []jira.Issue
 
-		err = jiraClient.Issue.SearchPages(fmt.Sprintf("project = %s AND status in (Resolved, Closed, Done) AND labels in (Impediment, impediment) AND updated >= -1d AND timespent is not EMPTY", project.Name), &jira.SearchOptions{
+		err = jiraClient.Issue.SearchPages(fmt.Sprintf("project = %s AND status in %s AND labels in (Impediment, impediment) AND updated >= -1d AND timespent is not EMPTY", project.Name, config.Jira.ClosedStatus), &jira.SearchOptions{
 			Fields: []string{"id", "key", "project", "created", "timespent"},
 		}, func(issue jira.Issue) error {
 			closedImpediments = append(closedImpediments, issue)
@@ -115,7 +115,7 @@ func getImpedimentSprintMetric(name, projectName, sprint string) *warp.GTS {
 	})
 }
 
-func processSprint(jiraClient *jira.Client, sprint jira.Sprint, projectName string, batch *warp.Batch) {
+func processSprint(jiraClient *jira.Client, sprint jira.Sprint, projectName string, batch *warp.Batch, jiraCloseStatus string) {
 	issues, _, err := jiraClient.Sprint.GetIssuesForSprint(sprint.ID)
 	if err != nil {
 		log.WithFields(log.Fields{"sprint": sprint.Name, "project": projectName}).
@@ -147,7 +147,7 @@ func processSprint(jiraClient *jira.Client, sprint jira.Sprint, projectName stri
 
 	// Get current sprint closed impediments
 	var impediments []jira.Issue
-	err = jiraClient.Issue.SearchPages(fmt.Sprintf("project = %s AND status in (Resolved, Closed, Done) AND labels in (Impediment, impediment) AND updated >= %s AND updated <= %s AND timespent is not EMPTY", projectName, sprint.StartDate.Format("2006-01-02"), sprint.EndDate.Format("2006-01-02")), &jira.SearchOptions{
+	err = jiraClient.Issue.SearchPages(fmt.Sprintf("project = %s AND status in %s AND labels in (Impediment, impediment) AND updated >= %s AND updated <= %s AND timespent is not EMPTY", projectName, jiraCloseStatus, sprint.StartDate.Format("2006-01-02"), sprint.EndDate.Format("2006-01-02")), &jira.SearchOptions{
 		Fields: []string{"id", "key", "project", "labels", "summary", "status", "timespent", impedimentField},
 	}, func(issue jira.Issue) error {
 		impediments = append(impediments, issue)

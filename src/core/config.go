@@ -21,9 +21,10 @@ type Project struct {
 
 // Jira define jira params
 type Jira struct {
-	Username string
-	Password string
-	URL      string
+	Username     string
+	Password     string
+	URL          string
+	ClosedStatus string
 }
 
 // Metrics define metrics params
@@ -119,6 +120,9 @@ func loadJira() (Jira, error) {
 	}
 	jira.URL = viper.GetString("jira.url")
 
+	viper.SetDefault("jira.closed.status", "(Resolved, Closed, Done)")
+
+	jira.ClosedStatus = viper.GetString("jira.closed.status")
 	return jira, nil
 }
 
