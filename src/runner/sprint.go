@@ -3,6 +3,7 @@ package runner
 import (
 	"bytes"
 	"fmt"
+	"strings"
 	"time"
 
 	warp "github.com/PierreZ/Warp10Exporter"
@@ -35,14 +36,17 @@ func SprintRunner(config core.Config) {
 			return
 		}
 
+		log.Warn(config.Jira.ClosedStatuses)
+		closed := fmt.Sprintf("(%s)", strings.Join(config.Jira.ClosedStatuses, ","))
+		log.Warn(closed)
 		for _, sprint := range sprints.Values {
-			processSprint(jiraClient, sprint, project.Name, batch, config.Jira.ClosedStatus)
+			processSprint(jiraClient, sprint, project.Name, batch, closed)
 		}
 
 		// Get last day closed impediment and set issue timespent at its creation date
 		var closedImpediments []jira.Issue
 
-		err = jiraClient.Issue.SearchPages(fmt.Sprintf("project = %s AND status in %s AND labels in (Impediment, impediment) AND updated >= -1d AND timespent is not EMPTY", project.Name, config.Jira.ClosedStatus), &jira.SearchOptions{
+		err = jiraClient.Issue.SearchPages(fmt.Sprintf("project = %s AND status in %s AND labels in (Impediment, impediment) AND updated >= -1d AND timespent is not EMPTY", project.Name, closed), &jira.SearchOptions{
 			Fields: []string{"id", "key", "project", "created", "timespent"},
 		}, func(issue jira.Issue) error {
 			closedImpediments = append(closedImpediments, issue)

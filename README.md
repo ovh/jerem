@@ -30,11 +30,12 @@ jira:
 If you have custom closed JIRA status for a ticket, you can set the following jira config key:
 
 ```yaml
-jira:
-  closed.status: "(Resolved, Closed, Done)"
+jira:  
+  closed.statuses:
+    - Done
 ```
 
-By default the closed JIRA status are `(Resolved, Closed, Done)`. A JiraQL list is expected for this optional parameter.
+By default the closed JIRA status are `(Resolved, Closed, Done)`. A list is expected for this optional parameter.
 
 Then adding the project is simply done by editing the `projects` key. A single JIRA project require only two keys in the configuration file: it's project name and it's board id.
 
