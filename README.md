@@ -78,7 +78,7 @@ In the grafana folder we are going to integrate all dashboards computed from Jer
 This dashboard needs a valid Warp 10 data source set up, with an `RTOKEN` variable set.
 To set up custom project for the program management dashboard, you need to update the `Project` variable. The value is a WarpScript string list. A valid value can be `[ 'SAN' 'OTHER' ]`. This render a dashboard in which we can switch on the `SAN` or to `OTHER` program management dashboard.
 
-## About Jerem
+## About Jerem
 
 Here we keep track of all blog posts about the Agile methodology related to Jerem:
 
