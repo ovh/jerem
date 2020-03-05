@@ -78,6 +78,14 @@ In the grafana folder we are going to integrate all dashboards computed from Jer
 This dashboard needs a valid Warp 10 data source set up, with an `RTOKEN` variable set.
 To set up custom project for the program management dashboard, you need to update the `Project` variable. The value is a WarpScript string list. A valid value can be `[ 'SAN' 'OTHER' ]`. This render a dashboard in which we can switch on the `SAN` or to `OTHER` program management dashboard.
 
+## About Jerem
+
+Here we keep track of all blog posts about the Agile methodology related to Jerem:
+
+- [The birth of agile telemetry at OVHcloud – Part I](https://www.ovh.com/blog/the-birth-of-agile-telemetry-at-ovhcloud-part-i/)
+- [Jerem: An Agile Bot](https://www.ovh.com/blog/jerem-an-agile-bot/)
+- [Agile telemetry at OVHCloud – Part II](https://www.ovh.com/blog/agile-telemetry-at-ovhcloud-part-ii/)
+
 ## Get in touch
 
 - Gitter: [metrics](https://gitter.im/ovh/metrics)
