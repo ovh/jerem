@@ -26,7 +26,12 @@ func init() {
 	cobra.OnInitialize(initConfig)
 
 	RootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is ./config.yml)")
-	RootCmd.PersistentFlags().Int32("log-level", 4, "set logging level between 0 and 5")
+	RootCmd.PersistentFlags().Int32("log-level", 4, "set logging level between 0 and 6")
+
+	// Bind persistent / local flags from cobra to viper
+	if err := viper.BindPFlags(RootCmd.PersistentFlags()); err != nil {
+		log.Fatal(err)
+	}
 }
 
 func initConfig() {
@@ -59,7 +64,6 @@ func initConfig() {
 	if level >= 0 && level < len(log.AllLevels) {
 		log.SetLevel(log.AllLevels[level])
 	}
-	log.SetLevel(log.AllLevels[5])
 }
 
 // RootCmd main command of jerem
