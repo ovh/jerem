@@ -95,6 +95,7 @@ Here we keep track of all blog posts about the Agile methodology related to Jere
 - [The birth of agile telemetry at OVHcloud – Part I](https://www.ovh.com/blog/the-birth-of-agile-telemetry-at-ovhcloud-part-i/)
 - [Jerem: An Agile Bot](https://www.ovh.com/blog/jerem-an-agile-bot/)
 - [Agile telemetry at OVHCloud – Part II](https://www.ovh.com/blog/agile-telemetry-at-ovhcloud-part-ii/)
+- [Agile telemetry at OVHCloud – Part III](https://www.ovh.com/blog/agile-telemetry-at-ovhcloud-part-iii/)
 
 ## Get in touch
 
