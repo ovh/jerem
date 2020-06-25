@@ -3,6 +3,7 @@ package runner
 import (
 	"bytes"
 	"fmt"
+	"net/url"
 	"strings"
 	"time"
 
@@ -36,17 +37,17 @@ func SprintRunner(config core.Config) {
 			return
 		}
 
-		log.Warn(config.Jira.ClosedStatuses)
+		log.Debug(config.Jira.ClosedStatuses)
 		closed := fmt.Sprintf("(%s)", strings.Join(config.Jira.ClosedStatuses, ","))
-		log.Warn(closed)
+
 		for _, sprint := range sprints.Values {
-			processSprint(jiraClient, sprint, project.Name, batch, closed)
+			processSprint(jiraClient, sprint, project, batch, closed)
 		}
 
 		// Get last day closed impediment and set issue timespent at its creation date
 		var closedImpediments []jira.Issue
 
-		err = jiraClient.Issue.SearchPages(fmt.Sprintf("project = %s AND status in %s AND labels in (Impediment, impediment) AND updated >= -1d AND timespent is not EMPTY", project.Name, closed), &jira.SearchOptions{
+		err = jiraClient.Issue.SearchPages(fmt.Sprintf("(project = \"%s\" %s) AND status in %s AND labels in (Impediment, impediment) AND updated >= -1d AND timespent is not EMPTY", project.Name, project.Jql, closed), &jira.SearchOptions{
 			Fields: []string{"id", "key", "project", "created", "timespent"},
 		}, func(issue jira.Issue) error {
 			closedImpediments = append(closedImpediments, issue)
@@ -59,7 +60,7 @@ func SprintRunner(config core.Config) {
 
 		if len(closedImpediments) > 0 {
 			gts := warp.NewGTS(fmt.Sprintf("jerem.jira.impediment.total.created")).WithLabels(warp.Labels{
-				"project": project.Name,
+				"project": project.Label,
 				"type":    "daily",
 				"value":   "timespent",
 			})
@@ -73,7 +74,6 @@ func SprintRunner(config core.Config) {
 	var b bytes.Buffer
 	batch.Print(&b)
 	log.Debug(b.String())
-
 	if len(*batch) != 0 {
 		err = batch.Push(config.Metrics.URL, config.Metrics.Token)
 		if err != nil {
@@ -82,9 +82,9 @@ func SprintRunner(config core.Config) {
 	}
 }
 
-func getSprintMetric(name string, projectName, sprint string) *warp.GTS {
+func getSprintMetric(name string, projectLabel, sprint string) *warp.GTS {
 	return warp.NewGTS(fmt.Sprintf("jerem.jira.sprint.%s", name)).WithLabels(warp.Labels{
-		"project": projectName,
+		"project": projectLabel,
 		"sprint":  sprint,
 	})
 }
@@ -111,54 +111,78 @@ func getImpedimentType(field string, issue jira.Issue) (string, error) {
 	return "unknown", nil
 }
 
-func getImpedimentSprintMetric(name, projectName, sprint string) *warp.GTS {
+func getImpedimentSprintMetric(name, projectLabel, sprint string) *warp.GTS {
 	return warp.NewGTS(fmt.Sprintf("jerem.jira.impediment.%s", name)).WithLabels(warp.Labels{
-		"project": projectName,
+		"project": projectLabel,
 		"type":    "sprint",
 		"sprint":  sprint,
 	})
 }
 
-func processSprint(jiraClient *jira.Client, sprint jira.Sprint, projectName string, batch *warp.Batch, jiraCloseStatus string) {
-	issues, _, err := jiraClient.Sprint.GetIssuesForSprint(sprint.ID)
+//GetIssuesForSprint overrides go-jira GetIssuesForSprint to apply jql filter on issues
+func GetIssuesForSprint(jiraClient *jira.Client, sprintID int, jql string) ([]jira.Issue, *jira.Response, error) {
+	if jql != "" {
+		apiEndpoint := fmt.Sprintf("rest/agile/1.0/sprint/%d/issue?jql=%s", sprintID, url.QueryEscape(jql))
+		req, err := jiraClient.NewRequest("GET", apiEndpoint, nil)
+		if err != nil {
+			return nil, nil, err
+		}
+		result := new(jira.IssuesInSprintResult)
+		resp, err := jiraClient.Do(req, result)
+		if err != nil {
+			err = jira.NewJiraError(resp, err)
+		}
+		log.WithFields(log.Fields{"project": jql, "count": len(result.Issues)}).Debug("Sprint issue")
+		return result.Issues, resp, err
+	}
+	return jiraClient.Sprint.GetIssuesForSprint(sprintID)
+}
+
+func processSprint(jiraClient *jira.Client, sprint jira.Sprint, project core.Project, batch *warp.Batch, jiraCloseStatus string) {
+	jql := ""
+	if project.Jql != "" {
+		jql = fmt.Sprintf("project=%s %s", project.Name, project.Jql)
+	}
+	issues, _, err := GetIssuesForSprint(jiraClient, sprint.ID, jql)
 	if err != nil {
-		log.WithFields(log.Fields{"sprint": sprint.Name, "project": projectName}).
+		log.WithFields(log.Fields{"sprint": sprint.Name, "project": project.Label}).
 			WithError(err).Warn("Fail to get issue for sprint")
 		return
 	}
+
 	storyPoints, _, _ := computeStoryPoints(issues, storyPointField)
 
 	// Gen metrics
 	now := time.Now().UTC()
-	gts := getSprintMetric("storypoint.total", projectName, "current").AddDatapoint(now, storyPoints["total"])
+	gts := getSprintMetric("storypoint.total", project.Label, "current").AddDatapoint(now, storyPoints["total"])
 	batch.Register(gts)
-	gts = getSprintMetric("storypoint.total", projectName, sprint.Name).AddDatapoint(now, storyPoints["total"])
+	gts = getSprintMetric("storypoint.total", project.Label, sprint.Name).AddDatapoint(now, storyPoints["total"])
 	batch.Register(gts)
-	gts = getSprintMetric("storypoint.inprogress", projectName, "current").AddDatapoint(now, storyPoints["indeterminate"])
+	gts = getSprintMetric("storypoint.inprogress", project.Label, "current").AddDatapoint(now, storyPoints["indeterminate"])
 	batch.Register(gts)
-	gts = getSprintMetric("storypoint.inprogress", projectName, sprint.Name).AddDatapoint(now, storyPoints["indeterminate"])
+	gts = getSprintMetric("storypoint.inprogress", project.Label, sprint.Name).AddDatapoint(now, storyPoints["indeterminate"])
 	batch.Register(gts)
-	gts = getSprintMetric("storypoint.done", projectName, "current").AddDatapoint(now, storyPoints["done"])
+	gts = getSprintMetric("storypoint.done", project.Label, "current").AddDatapoint(now, storyPoints["done"])
 	batch.Register(gts)
-	gts = getSprintMetric("storypoint.done", projectName, sprint.Name).AddDatapoint(now, storyPoints["done"])
+	gts = getSprintMetric("storypoint.done", project.Label, sprint.Name).AddDatapoint(now, storyPoints["done"])
 	batch.Register(gts)
 
 	// Add start and end date in sprint events series
-	gts = getSprintMetric("events", projectName, "current").AddDatapoint(*sprint.StartDate, "start").AddDatapoint(*sprint.EndDate, "end")
+	gts = getSprintMetric("events", project.Label, "current").AddDatapoint(*sprint.StartDate, "start").AddDatapoint(*sprint.EndDate, "end")
 	batch.Register(gts)
-	gts = getSprintMetric("events", projectName, sprint.Name).AddDatapoint(*sprint.StartDate, "start").AddDatapoint(*sprint.EndDate, "end")
+	gts = getSprintMetric("events", project.Label, sprint.Name).AddDatapoint(*sprint.StartDate, "start").AddDatapoint(*sprint.EndDate, "end")
 	batch.Register(gts)
 
 	// Get current sprint closed impediments
 	var impediments []jira.Issue
-	err = jiraClient.Issue.SearchPages(fmt.Sprintf("project = %s AND status in %s AND labels in (Impediment, impediment) AND updated >= %s AND updated <= %s AND timespent is not EMPTY", projectName, jiraCloseStatus, sprint.StartDate.Format("2006-01-02"), sprint.EndDate.Format("2006-01-02")), &jira.SearchOptions{
+	err = jiraClient.Issue.SearchPages(fmt.Sprintf("(project = \"%s\" %s) AND status in %s AND labels in (Impediment, impediment) AND updated >= %s AND updated <= %s AND timespent is not EMPTY", project.Name, project.Jql, jiraCloseStatus, sprint.StartDate.Format("2006-01-02"), sprint.EndDate.Format("2006-01-02")), &jira.SearchOptions{
 		Fields: []string{"id", "key", "project", "labels", "summary", "status", "timespent", impedimentField},
 	}, func(issue jira.Issue) error {
 		impediments = append(impediments, issue)
 		return nil
 	})
 	if err != nil {
-		log.WithFields(log.Fields{"sprint": sprint.Name, "project": projectName}).
+		log.WithFields(log.Fields{"sprint": sprint.Name, "project": project.Label}).
 			WithError(err).Warn("Fail to get sprint issues")
 		return
 	}
@@ -177,25 +201,25 @@ func processSprint(jiraClient *jira.Client, sprint jira.Sprint, projectName stri
 		impedimentSecond[impedimentType] = impedimentSecond[impedimentType] + impediment.Fields.TimeSpent
 	}
 
-	gts = getImpedimentSprintMetric("total.count", projectName, "current").AddDatapoint(now, impedimentCount["total"])
+	gts = getImpedimentSprintMetric("total.count", project.Label, "current").AddDatapoint(now, impedimentCount["total"])
 	batch.Register(gts)
-	gts = getImpedimentSprintMetric("total.count", projectName, sprint.Name).AddDatapoint(now, impedimentCount["total"])
+	gts = getImpedimentSprintMetric("total.count", project.Label, sprint.Name).AddDatapoint(now, impedimentCount["total"])
 	batch.Register(gts)
-	gts = getImpedimentSprintMetric("total.timespent", projectName, sprint.Name).AddDatapoint(now, impedimentSecond["total"])
+	gts = getImpedimentSprintMetric("total.timespent", project.Label, sprint.Name).AddDatapoint(now, impedimentSecond["total"])
 	batch.Register(gts)
-	gts = getImpedimentSprintMetric("total.timespent", projectName, "current").AddDatapoint(now, impedimentSecond["total"])
+	gts = getImpedimentSprintMetric("total.timespent", project.Label, "current").AddDatapoint(now, impedimentSecond["total"])
 	batch.Register(gts)
 
 	for impedimentType, v := range impedimentCount {
-		gts = getImpedimentSprintMetric(fmt.Sprintf("%s.count", impedimentType), projectName, "current").AddDatapoint(now, v)
+		gts = getImpedimentSprintMetric(fmt.Sprintf("%s.count", impedimentType), project.Label, "current").AddDatapoint(now, v)
 		batch.Register(gts)
-		gts = getImpedimentSprintMetric(fmt.Sprintf("%s.count", impedimentType), projectName, sprint.Name).AddDatapoint(now, v)
+		gts = getImpedimentSprintMetric(fmt.Sprintf("%s.count", impedimentType), project.Label, sprint.Name).AddDatapoint(now, v)
 		batch.Register(gts)
 	}
 	for impedimentType, v := range impedimentSecond {
-		gts = getImpedimentSprintMetric(fmt.Sprintf("%s.timespent", impedimentType), projectName, "current").AddDatapoint(now, v)
+		gts = getImpedimentSprintMetric(fmt.Sprintf("%s.timespent", impedimentType), project.Label, "current").AddDatapoint(now, v)
 		batch.Register(gts)
-		gts = getImpedimentSprintMetric(fmt.Sprintf("%s.timespent", impedimentType), projectName, sprint.Name).AddDatapoint(now, v)
+		gts = getImpedimentSprintMetric(fmt.Sprintf("%s.timespent", impedimentType), project.Label, sprint.Name).AddDatapoint(now, v)
 		batch.Register(gts)
 	}
 }

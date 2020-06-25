@@ -10,6 +10,8 @@ metrics:
 projects:
   - name: K8S
     board: 0
+    jql_filter: component = test
+    label: K8S_test
   - name: OB
     board: 1
 

@@ -2,6 +2,7 @@ package core
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/spf13/viper"
 )
@@ -17,6 +18,8 @@ type Config struct {
 type Project struct {
 	Name  string
 	Board int
+	Jql   string
+	Label string
 }
 
 // Jira define jira params
@@ -93,7 +96,25 @@ func loadProjects() ([]Project, error) {
 			return nil, fmt.Errorf("project %d board should be a number", idx)
 		}
 
-		res = append(res, Project{Name: name, Board: board})
+		jql := ""
+		if _, ok = project["jql_filter"]; ok {
+			jql, ok = project["jql_filter"].(string)
+			if !ok {
+				return nil, fmt.Errorf("jql filter '%d' should be a string", idx)
+			}
+			jql = fmt.Sprintf("AND (%s)", jql)
+		}
+
+		//If not label is provided, the project name is used
+		label := name
+		if _, ok = project["label"]; ok {
+			label, ok = project["label"].(string)
+			if !ok {
+				return nil, fmt.Errorf("label '%d' should be a string", idx)
+			}
+		}
+		label = strings.TrimSpace(label)
+		res = append(res, Project{Name: name, Board: board, Jql: jql, Label: label})
 	}
 
 	return res, nil

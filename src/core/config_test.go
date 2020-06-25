@@ -107,6 +107,54 @@ projects:
 	_, err := LoadConfig()
 	assert.EqualError(err, "project 0 board should be a number")
 }
+
+func TestProjectOptionalLabelAndJqlLoad(t *testing.T) {
+	assert := require.New(t)
+
+	// Load config
+	config := `
+jira:
+  username: jerem
+  password: foo
+  url: https://jira.com
+metrics:
+  url: https://metrics.ovh.net
+  token: mytoken
+projects:
+  - name: K8S
+    board: 94
+    jql_filter: component = test
+    label: test`
+	loadConfig(assert, config)
+
+	conf, err := LoadConfig()
+	assert.Empty(err)
+	assert.Equal(conf.Projects[0].Jql, "AND (component = test)", "The Jql filter should be surrouned by AND()")
+	assert.Equal(conf.Projects[0].Label, "test", "Label should be loaded")
+}
+
+func TestProjectEmptyqlLoad(t *testing.T) {
+	assert := require.New(t)
+
+	// Load config
+	config := `
+jira:
+  username: jerem
+  password: foo
+  url: https://jira.com
+metrics:
+  url: https://metrics.ovh.net
+  token: mytoken
+projects:
+  - name: K8S
+    board: 94`
+	loadConfig(assert, config)
+
+	conf, err := LoadConfig()
+	assert.Empty(err)
+	assert.Equal(conf.Projects[0].Jql, "", "The Jql filter should be empty")
+}
+
 func TestMissingJira(t *testing.T) {
 	assert := require.New(t)
 
