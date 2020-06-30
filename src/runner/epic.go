@@ -31,46 +31,47 @@ func EpicRunner(config core.Config) {
 		return
 	}
 
-	// Get epics
-	epics, err := getEpics(jiraClient, config.Projects)
-	if err != nil {
-		log.WithError(err).Error("Fail to get jira epics")
-		return
-	}
-
 	batch := warp.NewBatch()
 
-	// Count storypoints per epic
-	for _, epic := range epics {
-
-		status := getStatus(epic) // [undefined, new, indeterminate, done]
-
-		if status == jira.StatusCategoryComplete {
-			continue
+	// Get epics per project
+	for _, project := range config.Projects {
+		epics, err := getEpics(jiraClient, project)
+		if err != nil {
+			log.WithError(err).Error("Fail to get jira epics")
+			return
 		}
 
-		// Get global project related to current epic
-		global := "None"
-		for _, label := range epic.Fields.Labels {
-			if strings.HasPrefix(label, projectPrefix) {
-				global = strings.TrimLeft(label, projectPrefix)
+		// Count storypoints per epic
+		for _, epic := range epics {
+
+			status := getStatus(epic) // [undefined, new, indeterminate, done]
+
+			if status == jira.StatusCategoryComplete {
+				continue
+			}
+
+			// Get global project related to current epic
+			global := "None"
+			for _, label := range epic.Fields.Labels {
+				if strings.HasPrefix(label, projectPrefix) {
+					global = strings.TrimLeft(label, projectPrefix)
+				}
+			}
+
+			// Search for quarter label
+			for _, label := range epic.Fields.Labels {
+				if quarterRegex.MatchString(label) {
+					processEpic(jiraClient, epic, label, project.Label, global, batch)
+				}
+
 			}
 		}
 
-		// Search for quarter label
-		for _, label := range epic.Fields.Labels {
-
-			if quarterRegex.MatchString(label) {
-				processEpic(jiraClient, epic, label, global, batch)
-			}
-
-		}
 	}
 
 	var b bytes.Buffer
 	batch.Print(&b)
 	log.Debug(b.String())
-
 	if len(*batch) != 0 {
 		err = batch.Push(config.Metrics.URL, config.Metrics.Token)
 		if err != nil {
@@ -79,8 +80,8 @@ func EpicRunner(config core.Config) {
 	}
 }
 
-func getEpics(jiraClient *jira.Client, projects []core.Project) ([]jira.Issue, error) {
-	query := getEpicQuery(projects)
+func getEpics(jiraClient *jira.Client, project core.Project) ([]jira.Issue, error) {
+	query := getEpicQuery(project)
 
 	var epics []jira.Issue
 	err := jiraClient.Issue.SearchPages(query, &jira.SearchOptions{
@@ -97,21 +98,11 @@ func getEpics(jiraClient *jira.Client, projects []core.Project) ([]jira.Issue, e
 	return epics, nil
 }
 
-func getEpicQuery(projects []core.Project) string {
-	if len(projects) <= 0 {
-		return ""
-	}
-	var acc []string
-	for _, project := range projects {
-		acc = append(acc, fmt.Sprintf("project = \"%s\"", project.Name))
-	}
-	query := strings.Join(acc, " OR ")
-	query = fmt.Sprintf("(%s) AND issuetype = Epic", query)
-
-	return query
+func getEpicQuery(project core.Project) string {
+	return fmt.Sprintf("(project = \"%s\" %s) AND issuetype = Epic", project.Name, project.Jql)
 }
 
-func processEpic(jiraClient *jira.Client, epic jira.Issue, quarter, global string, batch *warp.Batch) {
+func processEpic(jiraClient *jira.Client, epic jira.Issue, quarter, projectLabel, global string, batch *warp.Batch) {
 	issues, err := getIssues(jiraClient, epic.Key)
 	if err != nil {
 		log.WithField("key", epic.Key).WithError(err).Warn("Fail to get jira issues")
@@ -122,15 +113,15 @@ func processEpic(jiraClient *jira.Client, epic jira.Issue, quarter, global strin
 
 	// Gen metrics
 	now := time.Now().UTC()
-	gts := getEpicMetric("storypoint", epic, quarter, global).AddDatapoint(now, storyPoints["total"])
+	gts := getEpicMetric("storypoint", epic, quarter, projectLabel, global).AddDatapoint(now, storyPoints["total"])
 	batch.Register(gts)
-	gts = getEpicMetric("unestimated", epic, quarter, global).AddDatapoint(now, float64(unestimated))
+	gts = getEpicMetric("unestimated", epic, quarter, projectLabel, global).AddDatapoint(now, float64(unestimated))
 	batch.Register(gts)
-	gts = getEpicMetric("dependency", epic, quarter, global).AddDatapoint(now, float64(dependency))
+	gts = getEpicMetric("dependency", epic, quarter, projectLabel, global).AddDatapoint(now, float64(dependency))
 	batch.Register(gts)
-	gts = getEpicMetric("storypoint.inprogress", epic, quarter, global).AddDatapoint(now, storyPoints["indeterminate"])
+	gts = getEpicMetric("storypoint.inprogress", epic, quarter, projectLabel, global).AddDatapoint(now, storyPoints["indeterminate"])
 	batch.Register(gts)
-	gts = getEpicMetric("storypoint.done", epic, quarter, global).AddDatapoint(now, storyPoints["done"])
+	gts = getEpicMetric("storypoint.done", epic, quarter, projectLabel, global).AddDatapoint(now, storyPoints["done"])
 	batch.Register(gts)
 }
 
@@ -159,9 +150,9 @@ func getStatus(issue jira.Issue) string {
 	return issue.Fields.Status.StatusCategory.Key
 }
 
-func getEpicMetric(name string, epic jira.Issue, quarter, global string) *warp.GTS {
+func getEpicMetric(name string, epic jira.Issue, quarter, projectLabel, global string) *warp.GTS {
 	return warp.NewGTS(fmt.Sprintf("jerem.jira.epic.%s", name)).WithLabels(warp.Labels{
-		"project": epic.Fields.Project.Key,
+		"project": projectLabel,
 		"key":     epic.Key,
 		"summary": epic.Fields.Summary,
 		"quarter": quarter,

@@ -43,6 +43,8 @@ Then adding the project is simply done by editing the `projects` key. A single J
 projects:
   - name: OB  # The JIRA board project name
     board: 0  # The JIRA board id (can be found in the board URL)
+    jql_filter: component = test # Optional parameter to filter JIRAs inside a project
+    label: OB_test # Optional parameter to override the project name with a custom label
 ```
 
 Then you can simply add a second project:
@@ -51,6 +53,8 @@ Then you can simply add a second project:
 projects:
   - name: OB
     board: 0
+    jql_filter: component = test
+    label: OB_test
   - name: K8S
     board: 1  
 ```
