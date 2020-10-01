@@ -34,7 +34,7 @@ func SprintRunner(config core.Config) {
 		sprints, _, err := jiraClient.Board.GetAllSprintsWithOptions(project.Board, options)
 		if err != nil {
 			log.WithField("project", project.Name).WithError(err).Warn("Fail to get sprints")
-			return
+			continue
 		}
 
 		log.Debug(config.Jira.ClosedStatuses)
