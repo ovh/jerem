@@ -38,7 +38,7 @@ func EpicRunner(config core.Config) {
 		epics, err := getEpics(jiraClient, project)
 		if err != nil {
 			log.WithError(err).Error("Fail to get jira epics")
-			return
+			continue
 		}
 
 		// Count storypoints per epic
